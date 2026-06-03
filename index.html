@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <title>Control Financiero Móvil</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- html2pdf.js para generación de PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Outfit', 'sans-serif'] },
+                    colors: {
+                        bgLight: '#F4F4F5',
+                        income: '#10B981',
+                        incomeLight: '#D1FAE5',
+                        expense: '#F43F5E',
+                        expenseLight: '#FFE4E6',
+                        warning: '#F59E0B',
+                        warningLight: '#FEF3C7',
+                        info: '#3B82F6',
+                        infoLight: '#DBEAFE',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar { display: none; }
+        
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            background-color: #F4F4F5;
+            color: #1E293B;
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: none;
+        }
+
+        .transition-all { transition-property: all; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 250ms; }
+        
+        .nav-item { color: #94A3B8; }
+        .nav-item.active { color: #0F172A; font-weight: 700; transform: translateY(-3px); }
+        .nav-item.active i { color: #10B981; }
+        
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        
+        .monto-input-custom { background: transparent; border: none; outline: none; width: 100%; text-align: center; }
+        .monto-input-custom::placeholder { color: rgba(255,255,255,0.4); }
+
+        .cat-btn { border: 2px solid transparent; background: #FFFFFF; transition: all 0.2s ease; }
+        .cat-btn.selected-income { background-color: #ECFDF5; border-color: #10B981; transform: scale(0.95); }
+        .cat-btn.selected-expense { background-color: #FFF1F2; border-color: #F43F5E; transform: scale(0.95); }
+        .cat-btn.selected-warning { background-color: #FEF3C7; border-color: #F59E0B; transform: scale(0.95); }
+
+        input, select { font-size: 16px !important; }
+        .text-huge { font-size: 2.25rem !important; }
+
+        @keyframes slideUp { from { transform: translate(-50%, 100%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+        .toast-animate { animation: slideUp 0.3s ease-out forwards; }
+        @keyframes shake { 0%, 100% {transform: translateX(0);} 25% {transform: translateX(-10px);} 75% {transform: translateX(10px);} }
+        .animate-shake { animation: shake 0.3s ease-in-out; }
+
+        #pdf-template { display: none; }
+    </style>
+</head>
+<body class="font-sans antialiased h-[100dvh] flex flex-col relative selection:bg-incomeLight selection:text-income">
+
+    <!-- ================= PANTALLA DE BLOQUEO (PIN / FaceID) ================= -->
+    <div id="view-lockscreen" class="fixed inset-0 bg-slate-900 z-[300] hidden flex flex-col items-center justify-between py-16">
+        <div class="flex flex-col items-center mt-10">
+            <i class="ph-fill ph-lock-key text-5xl text-blue-500 mb-6" id="lock-icon"></i>
+            <h2 class="text-white text-xl font-bold mb-8 tracking-wide" id="lock-title">Ingresa tu PIN</h2>
+            
+            <!-- Indicadores de PIN -->
+            <div class="flex gap-6 mb-12" id="pin-indicators">
+                <div class="w-4 h-4 rounded-full bg-slate-700 transition-colors duration-200"></div>
+                <div class="w-4 h-4 rounded-full bg-slate-700 transition-colors duration-200"></div>
+                <div class="w-4 h-4 rounded-full bg-slate-700 transition-colors duration-200"></div>
+                <div class="w-4 h-4 rounded-full bg-slate-700 transition-colors duration-200"></div>
+            </div>
+        </div>
+
+        <!-- Teclado Numérico -->
+        <div class="grid grid-cols-3 gap-x-8 gap-y-6 px-10 max-w-sm w-full mb-10">
+            <button onclick="window.pressPin('1')" class="w-16 h-16 mx-auto rounded-full bg-slate-800 text-white text-2xl font-bold active:bg-slate-700 transition-colors">1</button>
+            <button onclick="window.pressPin('2')" class="w-16 h-16 mx-auto rounded-full bg-slate-800 text-white text-2xl font-bold active:bg-slate-700 transition-colors">2</button>
+            <button onclick="window.pressPin('3')" class="w-16 h-16 mx-auto rounded-full bg-slate-800 text-white text-2xl font-bold active:bg-slate-700 transition-colors">3</button>
+            <button onclick="window.pressPin('4')" class="w-16 h-16 mx-auto rounded-full bg-slate-800 text-white text-2xl font-bold active:bg-slate-700 transition-colors">4</button>
+            <button onclick="window.pressPin('5')" class="w-16 h-16 mx-auto rounded-full bg-slate-800 text-white text-2xl font-bold active:bg-slate-700 transition-colors">5</button>
+            <button onclick="window.pressPin('6')" class="w-16 h-16 mx-auto rounded-full bg-slate-800 text-white text-2xl font-bold active:bg-slate-700 transition-colors">6</button>
+            <button onclick="window.pressPin('7')" class="w-16 h-16 mx-auto rounded-full bg-slate-800 text-white text-2xl font-bold active:bg-slate-700 transition-colors">7</button>
+            <button onclick="window.pressPin('8')" class="w-16 h-16 mx-auto rounded-full bg-slate-800 text-white text-2xl font-bold active:bg-slate-700 transition-colors">8</button>
+            <button onclick="window.pressPin('9')" class="w-16 h-16 mx-auto rounded-full bg-slate-800 text-white text-2xl font-bold active:bg-slate-700 transition-colors">9</button>
+            
+            <!-- Botón Biometría (FaceID/Huella) -->
+            <button onclick="window.iniciarBiometria()" id="btn-faceid" class="w-16 h-16 mx-auto rounded-full text-blue-400 text-4xl flex items-center justify-center active:scale-95 transition-transform invisible">
+                <i class="ph-fill ph-face-id"></i>
+            </button>
+            
+            <button onclick="window.pressPin('0')" class="w-16 h-16 mx-auto rounded-full bg-slate-800 text-white text-2xl font-bold active:bg-slate-700 transition-colors">0</button>
+            
+            <button onclick="window.deletePin()" class="w-16 h-16 mx-auto rounded-full text-slate-400 text-3xl flex items-center justify-center active:scale-95 transition-transform">
+                <i class="ph-fill ph-backspace"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Menú de Configuración y Seguridad (Settings Modal) -->
+    <div id="modal-settings" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] hidden flex flex-col justify-end">
+        <div class="bg-white w-full rounded-t-3xl p-6 shadow-2xl transform transition-transform duration-300 translate-y-full" id="modal-settings-content">
+            <div class="flex justify-between items-center mb-6">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600"><i class="ph-fill ph-gear text-lg"></i></div>
+                    <h2 class="text-xl font-bold text-slate-800">Configuración</h2>
+                </div>
+                <button onclick="window.cerrarSettings()" class="bg-slate-100 p-2 rounded-full text-slate-500 hover:bg-slate-200"><i class="ph ph-x text-lg font-bold"></i></button>
+            </div>
+
+            <div class="space-y-3 mb-6">
+                <!-- Toggle PIN -->
+                <div class="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <div>
+                        <h3 class="font-bold text-slate-800 text-[16px]">Bloqueo por PIN</h3>
+                        <p class="text-xs text-slate-500">Requerir 4 dígitos al abrir</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="toggle-pin" onchange="window.manejarTogglePin(this)" class="sr-only peer">
+                        <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-income"></div>
+                    </label>
+                </div>
+
+                <!-- Toggle FaceID -->
+                <div class="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100" id="opcion-biometria">
+                    <div>
+                        <h3 class="font-bold text-slate-800 text-[16px]">FaceID / Huella</h3>
+                        <p class="text-xs text-slate-500">Inicio rápido biométrico</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="toggle-bio" onchange="window.manejarToggleBio(this)" class="sr-only peer">
+                        <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-info"></div>
+                    </label>
+                </div>
+            </div>
+
+            <button onclick="window.cerrarSesionApp()" class="w-full bg-red-50 text-red-500 font-bold py-3.5 rounded-2xl border border-red-100 flex items-center justify-center gap-2 active:scale-95 transition-transform text-[16px]">
+                <i class="ph-fill ph-sign-out text-xl"></i> Cerrar Sesión Segura
+            </button>
+        </div>
+    </div>
+
+
+    <!-- Plantilla Oculta para el PDF -->
+    <div id="pdf-template" class="p-8 bg-white text-slate-800 font-sans" style="width: 800px; display: none;">
+        <div class="border-b-2 border-slate-200 pb-4 mb-6 flex justify-between items-end">
+            <div>
+                <h1 class="text-3xl font-black text-slate-900 tracking-tight">Estado de Cuenta</h1>
+                <p class="text-slate-500 font-medium mt-1" id="pdf-mes">Mes de Reporte</p>
+            </div>
+            <div class="text-right">
+                <p class="text-sm font-bold text-slate-400">Generado el:</p>
+                <p class="text-slate-800 font-bold" id="pdf-fecha-gen">Fecha</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-6 mb-8">
+            <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+                <p class="text-xs font-bold text-slate-400 uppercase mb-2">Resumen Soles (PEN)</p>
+                <div class="flex justify-between mb-1"><span class="text-slate-600">Ingresos:</span><span class="font-bold text-income" id="pdf-ing-sol">S/ 0.00</span></div>
+                <div class="flex justify-between mb-3"><span class="text-slate-600">Egresos:</span><span class="font-bold text-expense" id="pdf-egr-sol">S/ 0.00</span></div>
+                <div class="border-t border-slate-200 pt-2 flex justify-between"><span class="font-bold text-slate-800">Liquidez Final:</span><span class="font-black text-slate-900 text-lg" id="pdf-liq-sol">S/ 0.00</span></div>
+            </div>
+            <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+                <p class="text-xs font-bold text-slate-400 uppercase mb-2">Resumen Dólares (USD)</p>
+                <div class="flex justify-between mb-1"><span class="text-slate-600">Ingresos:</span><span class="font-bold text-info" id="pdf-ing-dol">$ 0.00</span></div>
+                <div class="flex justify-between mb-3"><span class="text-slate-600">Egresos:</span><span class="font-bold text-expense" id="pdf-egr-dol">$ 0.00</span></div>
+                <div class="border-t border-slate-200 pt-2 flex justify-between"><span class="font-bold text-slate-800">Fondo Total:</span><span class="font-black text-slate-900 text-lg" id="pdf-liq-dol">$ 0.00</span></div>
+            </div>
+        </div>
+
+        <h3 class="text-lg font-bold text-slate-800 mb-4 border-b border-slate-200 pb-2">Detalle de Movimientos</h3>
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="bg-slate-100 text-slate-600 text-xs uppercase tracking-wider">
+                    <th class="p-3 rounded-tl-lg">Fecha</th>
+                    <th class="p-3">Concepto</th>
+                    <th class="p-3">Categoría</th>
+                    <th class="p-3 rounded-tr-lg text-right">Monto</th>
+                </tr>
+            </thead>
+            <tbody id="pdf-tabla-body" class="text-sm"></tbody>
+        </table>
+        <p class="text-center text-xs text-slate-400 mt-8 pt-4 border-t border-slate-200">Documento generado por Control Financiero Experto.</p>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast-notif" class="fixed top-4 left-1/2 z-[100] hidden opacity-0 pointer-events-none w-max transform -translate-x-1/2">
+        <div id="toast-content" class="px-5 py-2.5 rounded-full font-bold text-white shadow-lg flex items-center gap-2 text-[16px]">
+            <i id="toast-icon" class="ph-fill ph-check-circle text-xl"></i>
+            <span id="toast-text">Registrado</span>
+        </div>
+    </div>
+
+    <!-- Modal Token -->
+    <div id="modal-token" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[70] hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl transform scale-95 transition-transform" id="modal-token-content">
+            <div class="w-14 h-14 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center text-2xl mx-auto mb-3"><i class="ph-fill ph-shield-check"></i></div>
+            <h3 class="text-center text-lg font-bold text-slate-800 mb-1">Confirmar Cobro</h3>
+            <div class="bg-slate-100 rounded-xl py-2 px-3 flex justify-center items-center gap-2 mb-4 border border-slate-200">
+                <span class="text-slate-400 text-[16px]">CÓDIGO:</span>
+                <span id="token-generado" class="text-xl font-black text-slate-800 tracking-widest font-mono select-none">----</span>
+            </div>
+            <input type="tel" inputmode="numeric" id="input-token-pago" placeholder="Código" oninput="window.validarTokenInput(this)" class="w-full bg-slate-50 border-2 border-slate-200 rounded-xl p-3 text-center font-bold tracking-widest focus:outline-none focus:border-blue-500 mb-4 font-mono transition-colors">
+            <div class="flex gap-3">
+                <button onclick="window.cerrarModalToken()" class="flex-1 bg-slate-100 text-slate-600 font-bold py-3 rounded-xl text-[16px]">Cancelar</button>
+                <button id="btn-confirmar-token" onclick="window.confirmarPagoCuota()" disabled class="flex-1 bg-slate-300 text-slate-500 font-bold py-3 rounded-xl cursor-not-allowed transition-colors text-[16px]">Verificar</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal PIN Eliminar -->
+    <div id="modal-pin" class="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-[80] hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl transform scale-95 transition-transform" id="modal-pin-content">
+            <div class="w-14 h-14 bg-red-50 text-red-500 rounded-full flex items-center justify-center text-2xl mx-auto mb-3"><i class="ph-fill ph-warning-octagon"></i></div>
+            <h3 class="text-center text-lg font-bold text-slate-800 mb-4">Borrar Historial</h3>
+            <input type="password" inputmode="numeric" id="input-pin-eliminar" placeholder="PIN Maestro" class="w-full bg-slate-50 border-2 border-slate-200 rounded-xl p-3 text-center font-black tracking-[0.3em] focus:outline-none focus:border-red-500 mb-4">
+            <div class="flex gap-3">
+                <button onclick="window.cerrarModalPin()" class="flex-1 bg-slate-100 text-slate-600 font-bold py-3 rounded-xl text-[16px]">Cancelar</button>
+                <button onclick="window.confirmarEliminarPrestamo()" class="flex-1 bg-red-500 text-white font-bold py-3 rounded-xl text-[16px]">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Crear Préstamo -->
+    <div id="modal-prestamo" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[50] hidden flex items-end justify-center">
+        <div class="bg-white w-full rounded-t-3xl p-5 shadow-2xl transform transition-transform duration-300 translate-y-full max-h-[90vh] flex flex-col" id="modal-content">
+            <div class="flex justify-between items-center mb-3 flex-shrink-0">
+                <h2 class="text-lg font-bold">Nuevo Préstamo</h2>
+                <div class="flex items-center gap-2">
+                    <button id="btn-moneda-prestamo" onclick="window.toggleMonedaPrestamo()" class="text-[16px] font-bold text-slate-800 bg-slate-100 rounded-lg px-2 py-1 shadow-sm active:scale-95 transition-all">S/</button>
+                    <button onclick="window.cerrarModalPrestamo()" class="p-1"><i class="ph ph-x text-xl"></i></button>
+                </div>
+            </div>
+            <div class="overflow-y-auto space-y-3 pb-safe px-1 flex-1">
+                <div class="flex items-center gap-2 bg-blue-50 p-3 rounded-xl border border-blue-100">
+                    <input type="checkbox" id="check-temporal" onchange="window.togglePrestamoTemporal()" class="w-5 h-5 rounded border-blue-300 text-blue-500 focus:ring-blue-500">
+                    <label for="check-temporal" class="text-[16px] font-bold text-blue-800">Préstamo Temporal (Sin interés)</label>
+                </div>
+                <input type="text" id="nuevo-prestamo-nombre" placeholder="Nombre del deudor (Obligatorio)" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium focus:outline-none focus:border-blue-500">
+                <div class="grid grid-cols-2 gap-3">
+                    <input type="text" inputmode="decimal" id="nuevo-prestamo-capital" placeholder="Capital" oninput="window.validarNumero(this); window.calcularPrestamoAuto()" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold focus:outline-none focus:border-blue-500">
+                    <input type="text" inputmode="decimal" id="nuevo-prestamo-porcentaje" placeholder="Interés (%)" oninput="window.validarNumero(this); window.calcularPrestamoAuto()" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="bg-slate-100 rounded-xl p-3 text-center">
+                    <div class="flex justify-between mb-1 text-slate-500 text-[16px]"><span>Ganancia:</span><span id="calc-ganancia" class="font-bold">+ 0.00</span></div>
+                    <div class="flex justify-between font-bold text-slate-800 text-[16px] border-t border-slate-200 pt-1 mt-1"><span>A cobrar:</span><span id="calc-total">0.00</span></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <select id="nuevo-prestamo-frecuencia" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 font-medium">
+                        <option value="Semanal">Semanal</option><option value="Quincenal">Quincenal</option><option value="Mensual">Mensual</option><option value="Único">Único Final</option>
+                    </select>
+                    <input type="tel" inputmode="numeric" id="nuevo-prestamo-cuotas" value="1" placeholder="N° Cuotas" oninput="window.validarEntero(this); window.calcularPrestamoAuto()" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold focus:outline-none focus:border-blue-500">
+                </div>
+                <p class="font-bold text-blue-500 text-center text-[16px]" id="calc-cuota-monto">Cuota: 0.00</p>
+                <button onclick="window.guardarPrestamo()" class="w-full bg-slate-800 text-white font-bold py-3.5 rounded-xl shadow-md active:scale-95 transition-transform mt-2 text-[16px]">Otorgar Crédito</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal DETALLE Préstamo -->
+    <div id="modal-detalle-prestamo" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] hidden flex items-end justify-center">
+        <div class="bg-white w-full rounded-t-3xl p-5 shadow-2xl transform transition-transform duration-300 translate-y-full h-[85dvh] flex flex-col" id="modal-detalle-content">
+            <div class="flex justify-between items-center mb-4 flex-shrink-0">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-800" id="detalle-nombre">Nombre</h2>
+                    <p class="text-[16px] text-slate-500" id="detalle-estado">Activo</p>
+                </div>
+                <button onclick="window.cerrarDetallePrestamo()" class="p-2"><i class="ph ph-x text-xl font-bold"></i></button>
+            </div>
+            <div class="mb-4 flex-shrink-0">
+                <div class="flex justify-between font-bold text-slate-500 mb-1 text-[16px]"><span id="detalle-progreso-texto">Progreso</span><span id="detalle-porcentaje-texto">0%</span></div>
+                <div class="w-full bg-slate-100 rounded-full h-2"><div class="bg-info h-2 rounded-full transition-all duration-500" id="detalle-barra" style="width: 0%"></div></div>
+                <p class="text-center font-black text-slate-800 mt-2 text-lg" id="detalle-restante">Falta 0.00</p>
+            </div>
+            <div class="flex justify-between items-center mb-2 flex-shrink-0">
+                <h3 class="text-[16px] font-bold text-slate-400 uppercase tracking-wide">Plan de Pagos</h3>
+                <button id="btn-eliminar-prestamo" onclick="window.iniciarEliminarPrestamo()" class="hidden font-bold text-red-500 bg-red-50 px-3 py-1.5 rounded-lg active:scale-95 text-[16px]"><i class="ph-fill ph-trash"></i> Borrar</button>
+            </div>
+            <div class="overflow-y-auto flex-1 pr-1 space-y-2 pb-safe" id="detalle-lista-cuotas"></div>
+        </div>
+    </div>
+
+    <!-- ================= ÁREA PRINCIPAL ================= -->
+    <main class="flex-1 overflow-y-auto w-full relative z-0" id="main-content">
+
+        <!-- VISTA 1: REGISTRO RÁPIDO -->
+        <div id="view-registro" class="h-full flex flex-col bg-bgLight">
+            <div id="registro-header" class="pt-5 pb-5 px-4 bg-income transition-colors duration-300 rounded-b-[2rem] shadow-md z-10 flex-shrink-0">
+                <div class="flex justify-center bg-black/10 p-1 rounded-full w-max mx-auto mb-4">
+                    <button onclick="window.setTipoRegistro('ingreso')" id="btn-tab-ingreso" class="px-5 py-1.5 rounded-full text-[16px] font-bold bg-white text-income shadow-sm transition-all">Ingreso</button>
+                    <button onclick="window.setTipoRegistro('egreso')" id="btn-tab-egreso" class="px-5 py-1.5 rounded-full text-[16px] font-medium text-white/80 transition-all">Egreso</button>
+                </div>
+                <div class="text-center">
+                    <div class="flex items-center justify-center gap-2">
+                        <button id="btn-moneda-registro" onclick="window.toggleMonedaRegistro()" class="text-xl font-bold text-slate-800 bg-white rounded-lg px-3 py-1 shadow-sm active:scale-95 transition-all">S/</button>
+                        <input type="text" inputmode="decimal" id="monto-input-visual" placeholder="0.00" oninput="window.formatInputValue(this)" class="monto-input-custom text-huge font-black text-white w-48 font-mono">
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex-1 px-4 pt-4 pb-24 flex flex-col overflow-y-auto">
+                <div id="grid-ingresos" class="grid grid-cols-4 gap-2 mb-3">
+                    <button onclick="window.selectCategory(this, 'income', 'Sueldo')" class="cat-btn flex flex-col items-center p-2.5 rounded-xl shadow-sm"><div class="text-income text-2xl mb-1"><i class="ph-fill ph-shield-check"></i></div><span class="text-[12px] font-semibold text-slate-600">Sueldo</span></button>
+                    <button onclick="window.selectCategory(this, 'income', 'Eventual')" class="cat-btn flex flex-col items-center p-2.5 rounded-xl shadow-sm"><div class="text-income text-2xl mb-1"><i class="ph-fill ph-ticket"></i></div><span class="text-[12px] font-semibold text-slate-600">Eventual</span></button>
+                    <button onclick="window.selectCategory(this, 'income', 'Ventas')" class="cat-btn flex flex-col items-center p-2.5 rounded-xl shadow-sm"><div class="text-income text-2xl mb-1"><i class="ph-fill ph-storefront"></i></div><span class="text-[12px] font-semibold text-slate-600">Ventas</span></button>
+                    <button onclick="window.selectCategory(this, 'income', 'Extras')" class="cat-btn flex flex-col items-center p-2.5 rounded-xl shadow-sm"><div class="text-income text-2xl mb-1"><i class="ph-fill ph-coins"></i></div><span class="text-[12px] font-semibold text-slate-600">Extras</span></button>
+                </div>
+                <div id="grid-egresos" class="grid grid-cols-4 gap-2 hidden mb-3">
+                    <button onclick="window.selectCategory(this, 'expense', 'Fijos')" class="cat-btn flex flex-col items-center p-2.5 rounded-xl shadow-sm"><div class="text-expense text-2xl mb-1"><i class="ph-fill ph-house"></i></div><span class="text-[12px] font-semibold text-slate-600">Fijos</span></button>
+                    <button onclick="window.selectCategory(this, 'expense', 'Comida')" class="cat-btn flex flex-col items-center p-2.5 rounded-xl shadow-sm"><div class="text-expense text-2xl mb-1"><i class="ph-fill ph-fork-knife"></i></div><span class="text-[12px] font-semibold text-slate-600">Comida</span></button>
+                    <button onclick="window.selectCategory(this, 'expense', 'Transporte')" class="cat-btn flex flex-col items-center p-2.5 rounded-xl shadow-sm"><div class="text-expense text-2xl mb-1"><i class="ph-fill ph-car"></i></div><span class="text-[12px] font-semibold text-slate-600">Transporte</span></button>
+                    <button onclick="window.selectCategory(this, 'expense', 'Diversión')" class="cat-btn flex flex-col items-center p-2.5 rounded-xl shadow-sm"><div class="text-expense text-2xl mb-1"><i class="ph-fill ph-martini"></i></div><span class="text-[12px] font-semibold text-slate-600">Diversión</span></button>
+                    <button onclick="window.selectCategory(this, 'expense', 'Inversión')" class="cat-btn flex flex-col items-center p-2.5 rounded-xl shadow-sm col-span-2"><div class="text-expense text-2xl mb-1"><i class="ph-fill ph-trend-up"></i></div><span class="text-[12px] font-semibold text-slate-600">Inversión (Compras)</span></button>
+                    <button onclick="window.selectCategory(this, 'expense', 'Imprevisto', true)" class="cat-btn flex flex-col items-center p-2.5 rounded-xl shadow-sm col-span-2 bg-warningLight/20 border-warning/30"><div class="text-warning text-2xl mb-1"><i class="ph-fill ph-warning"></i></div><span class="text-[12px] font-bold text-warning">Imprevisto</span></button>
+                </div>
+                <div id="selector-imprevisto" class="hidden mb-3">
+                    <select id="select-imprevisto" class="w-full bg-warningLight/30 border border-warning/30 rounded-xl p-3 font-bold text-warning focus:outline-none focus:border-warning">
+                        <option value="Salud">Emergencia Médica</option><option value="Vehículo">Avería Vehículo</option><option value="Hogar">Avería Hogar</option>
+                    </select>
+                </div>
+                <div class="mb-auto mt-2">
+                    <div class="relative">
+                        <i class="ph ph-text-align-left absolute left-3 top-3.5 text-slate-400 text-lg"></i>
+                        <input type="text" id="nota-input" placeholder="Descripción breve (opcional)" class="w-full bg-white border border-slate-100 shadow-sm rounded-xl py-3 pl-10 pr-3 font-medium text-slate-700 focus:outline-none focus:border-slate-300">
+                    </div>
+                </div>
+                <button id="btn-guardar" onclick="window.guardarRegistro()" class="w-full bg-income text-white font-bold py-4 rounded-2xl shadow-float active:scale-[0.98] transition-all flex justify-center items-center gap-2 mt-4 text-lg">
+                    <i class="ph-fill ph-check-circle text-2xl"></i><span>Registrar en Nube</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- VISTA 2: DASHBOARD -->
+        <div id="view-dashboard" class="hidden flex flex-col h-full bg-bgLight">
+            <div class="px-4 pt-6 pb-24 overflow-y-auto flex-1 space-y-4">
+                <div class="flex justify-between items-center mb-2">
+                    <div>
+                        <h1 class="text-xl font-extrabold text-slate-800 tracking-tight" id="mes-actual">Resumen</h1>
+                    </div>
+                    <button onclick="window.abrirSettings()" class="bg-white p-2.5 rounded-full shadow-soft text-slate-600 hover:text-slate-800 transition-colors active:scale-95">
+                        <i class="ph-fill ph-gear text-2xl"></i>
+                    </button>
+                </div>
+
+                <!-- Tarjeta Liquidez -->
+                <div id="tarjeta-liquidez" class="bg-income rounded-[2rem] p-5 shadow-float relative overflow-hidden transition-colors duration-500">
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-white rounded-full blur-3xl opacity-10 -mr-10 -mt-10"></div>
+                    <div class="flex justify-between items-center mb-1 relative z-10">
+                        <p class="text-white/80 font-bold uppercase tracking-wider text-[12px]">Liquidez Soles</p>
+                        <button onclick="window.toggleSaldo()" class="text-white/80 hover:text-white p-1"><i id="icon-ojo" class="ph-fill ph-eye text-xl"></i></button>
+                    </div>
+                    <div class="flex items-baseline gap-1 mb-4 relative z-10">
+                        <span class="text-xl font-bold text-white/80">S/</span>
+                        <h2 id="saldo-soles" class="text-4xl font-black text-white tracking-tight">0.00</h2>
+                    </div>
+                    <div class="flex gap-2 relative z-10">
+                        <div class="bg-black/10 px-3 py-2 rounded-xl flex items-center gap-1.5 backdrop-blur-sm border border-white/10 w-full justify-between">
+                            <span class="font-bold text-white/70 text-[12px]">FONDO DÓLARES</span>
+                            <span id="saldo-dolares" class="font-bold text-white text-[16px]">$ 0.00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-4 shadow-soft">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-bold text-slate-500 uppercase tracking-wide text-[12px]">Flujo Soles (Mes)</h3>
+                        <span id="badge-flujo-soles" class="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-slate-100 text-slate-500">Sin Datos</span>
+                    </div>
+                    <div class="mb-3">
+                        <div class="flex justify-between font-bold mb-1 text-[12px]">
+                            <span class="text-income">Ingresos</span><span id="flujo-ingresos-soles" class="text-slate-800">S/ 0.00</span>
+                        </div>
+                        <div class="w-full bg-slate-100 rounded-full h-2"><div id="barra-ingresos-soles" class="bg-income h-2 rounded-full" style="width: 0%"></div></div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between font-bold mb-1 text-[12px]">
+                            <span class="text-expense">Egresos</span><span id="flujo-egresos-soles" class="text-slate-800">S/ 0.00</span>
+                        </div>
+                        <div class="w-full bg-slate-100 rounded-full h-2"><div id="barra-egresos-soles" class="bg-expense h-2 rounded-full" style="width: 0%"></div></div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-4 shadow-soft">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-bold text-slate-500 uppercase tracking-wide text-[12px]">Flujo Dólares (Mes)</h3>
+                        <span id="badge-flujo-dolares" class="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-slate-100 text-slate-500">Sin Datos</span>
+                    </div>
+                    <div class="mb-3">
+                        <div class="flex justify-between font-bold mb-1 text-[12px]">
+                            <span class="text-info">Ingresos</span><span id="flujo-ingresos-dolares" class="text-slate-800">$ 0.00</span>
+                        </div>
+                        <div class="w-full bg-slate-100 rounded-full h-2"><div id="barra-ingresos-dolares" class="bg-info h-2 rounded-full" style="width: 0%"></div></div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between font-bold mb-1 text-[12px]">
+                            <span class="text-expense">Egresos</span><span id="flujo-egresos-dolares" class="text-slate-800">$ 0.00</span>
+                        </div>
+                        <div class="w-full bg-slate-100 rounded-full h-2"><div id="barra-egresos-dolares" class="bg-expense h-2 rounded-full" style="width: 0%"></div></div>
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 class="font-bold text-slate-800 mb-2 px-1 text-[16px]">Historial Nube</h3>
+                    <div class="space-y-2" id="lista-historial">
+                        <p class="text-center font-medium text-slate-400 py-4 text-[16px]">Cargando...</p>
+                    </div>
+                    <button id="btn-ver-mas-historial" onclick="window.verTodoElHistorial()" class="hidden w-full text-center py-3 mt-2 font-bold text-info text-sm bg-infoLight/30 rounded-xl hover:bg-infoLight/50 transition-colors">
+                        Ver todos los movimientos del mes
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- VISTA 3: SIMULADORES / ANÁLISIS Y PDF -->
+        <div id="view-simuladores" class="hidden flex flex-col h-full bg-bgLight">
+            <div class="px-4 pt-6 pb-24 overflow-y-auto flex-1 space-y-4">
+                <h1 class="text-xl font-extrabold text-slate-800 tracking-tight">Laboratorio & Reportes</h1>
+                
+                <div class="bg-white rounded-[2rem] p-5 shadow-soft border border-slate-100">
+                    <div class="w-12 h-12 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center mb-3 text-2xl"><i class="ph-fill ph-rocket-launch"></i></div>
+                    <h3 class="font-bold text-lg text-slate-800 mb-3 leading-tight">Evaluar Inversión/Compra</h3>
+                    <div class="flex gap-2 mb-3">
+                        <input type="tel" inputmode="decimal" id="sim-inv-costo" placeholder="Costo S/" oninput="window.validarNumero(this)" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold focus:outline-none focus:border-blue-500">
+                        <input type="tel" inputmode="numeric" id="sim-inv-meses" placeholder="Meses" oninput="window.validarEntero(this)" class="w-1/3 bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold text-center focus:outline-none focus:border-blue-500">
+                    </div>
+                    <button onclick="window.analizarInversion()" class="w-full bg-slate-800 text-white font-bold py-3.5 rounded-xl active:scale-95 transition-transform text-[16px]">Analizar Compra</button>
+                    <div id="res-inversion" class="hidden mt-4 p-4 rounded-xl border"></div>
+                </div>
+
+                <div class="bg-white rounded-[2rem] p-5 shadow-soft border border-slate-100">
+                    <div class="w-12 h-12 bg-indigo-50 text-indigo-500 rounded-xl flex items-center justify-center mb-3 text-2xl"><i class="ph-fill ph-scales"></i></div>
+                    <h3 class="font-bold text-lg text-slate-800 mb-3 leading-tight">Evaluar Riesgo de Préstamo</h3>
+                    <div class="flex gap-2 mb-3">
+                        <input type="tel" inputmode="decimal" id="sim-pre-capital" placeholder="Capital S/" oninput="window.validarNumero(this)" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold focus:outline-none focus:border-indigo-500">
+                        <input type="tel" inputmode="decimal" id="sim-pre-interes" placeholder="Interés %" oninput="window.validarNumero(this)" class="w-1/3 bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold text-center focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <button onclick="window.analizarPrestamo()" class="w-full bg-indigo-600 text-white font-bold py-3.5 rounded-xl active:scale-95 transition-transform text-[16px]">Medir Riesgo</button>
+                    <div id="res-prestamo" class="hidden mt-4 p-4 rounded-xl border"></div>
+                </div>
+
+                <div class="bg-white rounded-[2rem] p-5 shadow-soft border border-slate-100">
+                    <div class="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-xl flex items-center justify-center mb-3 text-2xl"><i class="ph-fill ph-file-pdf"></i></div>
+                    <h3 class="font-bold text-lg text-slate-800 mb-2 leading-tight">Exportar Estado de Cuenta</h3>
+                    <select id="select-mes-pdf" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold focus:outline-none focus:border-emerald-500 mb-3 text-slate-700"></select>
+                    <button onclick="window.generarPDF()" id="btn-generar-pdf" class="w-full bg-emerald-500 text-white font-bold py-3.5 rounded-xl active:scale-95 transition-transform text-[16px] flex justify-center items-center gap-2 shadow-md">
+                        <i class="ph-fill ph-download-simple text-xl"></i> Descargar PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- VISTA 4: PRÉSTAMOS -->
+        <div id="view-prestamos" class="hidden flex flex-col h-full bg-bgLight">
+            <div class="px-4 pt-6 pb-24 overflow-y-auto flex-1 space-y-4">
+                <div class="flex justify-between items-end mb-2">
+                    <h1 class="text-xl font-extrabold text-slate-800 tracking-tight">Préstamos</h1>
+                    <button onclick="window.abrirModalPrestamo()" class="bg-slate-800 text-white w-10 h-10 rounded-xl flex items-center justify-center shadow-md active:scale-95"><i class="ph ph-plus text-xl font-bold"></i></button>
+                </div>
+                <div id="lista-prestamos" class="space-y-3">
+                    <p class="text-center font-medium text-slate-400 py-10 text-[16px]">Cargando nube...</p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <nav class="bg-white/95 backdrop-blur-lg border-t border-slate-200 absolute bottom-0 w-full px-2 py-2 flex justify-between items-center z-20 pb-safe shadow-[0_-5px_15px_rgba(0,0,0,0.03)]">
+        <button onclick="window.navigate('registro', this)" class="nav-item active flex flex-col items-center gap-1 flex-1 py-1">
+            <i class="ph-fill ph-plus-circle text-[24px]"></i><span class="text-[10px] uppercase tracking-wider font-bold">Registro</span>
+        </button>
+        <button onclick="window.navigate('dashboard', this)" class="nav-item flex flex-col items-center gap-1 flex-1 py-1">
+            <i class="ph-fill ph-chart-pie-slice text-[24px]"></i><span class="text-[10px] uppercase tracking-wider font-bold">Resumen</span>
+        </button>
+        <button onclick="window.navigate('prestamos', this)" class="nav-item flex flex-col items-center gap-1 flex-1 py-1">
+            <i class="ph-fill ph-hand-coins text-[24px]"></i><span class="text-[10px] uppercase tracking-wider font-bold">Créditos</span>
+        </button>
+        <button onclick="window.navigate('simuladores', this)" class="nav-item flex flex-col items-center gap-1 flex-1 py-1">
+            <i class="ph-fill ph-flask text-[24px]"></i><span class="text-[10px] uppercase tracking-wider font-bold">Análisis</span>
+        </button>
+    </nav>
+
+    <!-- FIREBASE & JS INTEGRATION -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, collection, onSnapshot, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const userFirebaseConfig = {
+            apiKey: "AIzaSyB2NjGDJSX1g-dPph8-_nKFtlfLliEqsCY",
+            authDomain: "control-finanzas-f7e53.firebaseapp.com",
+            projectId: "control-finanzas-f7e53",
+            storageBucket: "control-finanzas-f7e53.firebasestorage.app",
+            messagingSenderId: "698737327266",
+            appId: "1:698737327266:web:f3e23f14e55de995652bfb"
+        };
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : userFirebaseConfig;
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appIdStr = typeof __app_id !== 'undefined' ? __app_id : 'control-finanzas';
+        let currentUser = null;
+
+        // ESTADOS GLOBALES DE LA APP
+        window.tipoActual = 'ingreso'; 
+        window.monedaRegistro = 'PEN';
+        window.monedaPrestamo = 'PEN';
+        window.categoriaSeleccionada = null;
+        window.saldosOcultos = false; 
+        
+        window.state = { soles: 0, dolares: 0, ingresosSoles: 0, egresosSoles: 0, ingresosDolares: 0, egresosDolares: 0 };
+        window.dbPrestamos = [];
+        window.historialMovimientos = [];
+        window.maxHistorialVisible = 5;
+
+        window.cuotaPendientePago = null; 
+        window.prestamoPendienteEliminar = null;
+        window.tokenGeneradoActual = "";
+
+        // --- SISTEMA DE SEGURIDAD LOCAL (PIN Y BIOMETRÍA) ---
+        let currentPinMode = 'unlock'; // 'unlock', 'set'
+        let pendingSetPin = "";
+        let enteredPin = "";
+        const HAS_PIN = localStorage.getItem('app_pin') !== null;
+        const HAS_BIO = localStorage.getItem('app_bio') === 'true';
+
+        // --- FUNCIONES ASIGNADAS AL WINDOW (HOISTING SEGURO PARA HTML) ---
+        window.formatMoney = (val) => Number(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        window.getFechaActualStr = () => {
+            const d = new Date();
+            return `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+        };
+
+        const catIcons = {
+            'Sueldo': { icon: 'ph-shield-check', color: 'income', bg: 'incomeLight' },
+            'Eventual': { icon: 'ph-ticket', color: 'income', bg: 'incomeLight' },
+            'Ventas': { icon: 'ph-storefront', color: 'income', bg: 'incomeLight' },
+            'Extras': { icon: 'ph-coins', color: 'income', bg: 'incomeLight' },
+            'Fijos': { icon: 'ph-house', color: 'expense', bg: 'expenseLight' },
+            'Comida': { icon: 'ph-fork-knife', color: 'expense', bg: 'expenseLight' },
+            'Transporte': { icon: 'ph-car', color: 'expense', bg: 'expenseLight' },
+            'Inversión': { icon: 'ph-trend-up', color: 'expense', bg: 'expenseLight' },
+            'Diversión': { icon: 'ph-martini', color: 'expense', bg: 'expenseLight' },
+            'Imprevisto': { icon: 'ph-warning', color: 'warning', bg: 'warningLight' },
+            'Préstamo': { icon: 'ph-hand-coins', color: 'expense', bg: 'expenseLight' },
+            'Cobro': { icon: 'ph-hand-coins', color: 'income', bg: 'incomeLight' }
+        };
+
+        window.mostrarToast = function(msg, bg, icon) {
+            const toast = document.getElementById('toast-notif');
+            document.getElementById('toast-content').className = `px-5 py-2.5 rounded-full font-bold text-white shadow-lg flex items-center gap-2 text-[16px] ${bg}`;
+            document.getElementById('toast-icon').className = `ph-fill ${icon} text-xl`;
+            document.getElementById('toast-text').innerText = msg;
+            toast.classList.remove('hidden'); toast.classList.add('opacity-100');
+            document.getElementById('toast-content').classList.add('toast-animate');
+            setTimeout(() => { toast.classList.remove('opacity-100'); setTimeout(() => toast.classList.add('hidden'), 300); }, 2000);
+        };
+
+        window.actualizarUI = function() {
+            const els = {
+                'saldo-soles': window.formatMoney(window.state.soles), 
+                'saldo-dolares': `$ ${window.formatMoney(window.state.dolares)}`,
+                'flujo-ingresos-soles': `S/ ${window.formatMoney(window.state.ingresosSoles)}`, 
+                'flujo-egresos-soles': `S/ ${window.formatMoney(window.state.egresosSoles)}`,
+                'flujo-ingresos-dolares': `$ ${window.formatMoney(window.state.ingresosDolares)}`, 
+                'flujo-egresos-dolares': `$ ${window.formatMoney(window.state.egresosDolares)}`
+            };
+            for(const [id, val] of Object.entries(els)) {
+                const el = document.getElementById(id);
+                if(el) { el.setAttribute('data-valor', val); if(!window.saldosOcultos) el.innerText = val; }
+            }
+
+            const tLiquidez = document.getElementById('tarjeta-liquidez');
+            tLiquidez.className = 'rounded-[2rem] p-5 shadow-float relative overflow-hidden transition-colors duration-500';
+            if(window.state.soles < 0) tLiquidez.classList.add('bg-expense');
+            else if(window.state.ingresosSoles > 0 && (window.state.egresosSoles / window.state.ingresosSoles) > 0.80) tLiquidez.classList.add('bg-warning');
+            else tLiquidez.classList.add('bg-income');
+
+            const maxSoles = Math.max(window.state.ingresosSoles, window.state.egresosSoles, 1);
+            document.getElementById('barra-ingresos-soles').style.width = `${(window.state.ingresosSoles / maxSoles) * 100}%`;
+            document.getElementById('barra-egresos-soles').style.width = `${(window.state.egresosSoles / maxSoles) * 100}%`;
+            const badgeSoles = document.getElementById('badge-flujo-soles');
+            if(window.state.ingresosSoles === 0 && window.state.egresosSoles === 0) {
+                badgeSoles.innerText = "Sin Datos"; badgeSoles.className = "text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-slate-100 text-slate-500";
+            } else if (window.state.egresosSoles > window.state.ingresosSoles) {
+                badgeSoles.innerText = "Déficit"; badgeSoles.className = "text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-expenseLight text-expense";
+            } else {
+                badgeSoles.innerText = `${Math.round((window.state.egresosSoles / window.state.ingresosSoles) * 100)}% Gastado`;
+                badgeSoles.className = "text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-incomeLight text-income";
+            }
+
+            const maxUSD = Math.max(window.state.ingresosDolares, window.state.egresosDolares, 1);
+            document.getElementById('barra-ingresos-dolares').style.width = `${(window.state.ingresosDolares / maxUSD) * 100}%`;
+            document.getElementById('barra-egresos-dolares').style.width = `${(window.state.egresosDolares / maxUSD) * 100}%`;
+            const badgeUSD = document.getElementById('badge-flujo-dolares');
+            if(window.state.ingresosDolares === 0 && window.state.egresosDolares === 0) {
+                badgeUSD.innerText = "Sin Datos"; badgeUSD.className = "text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-slate-100 text-slate-500";
+            } else if (window.state.egresosDolares > window.state.ingresosDolares) {
+                badgeUSD.innerText = "Déficit"; badgeUSD.className = "text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-expenseLight text-expense";
+            } else {
+                badgeUSD.innerText = `${Math.round((window.state.egresosDolares / window.state.ingresosDolares) * 100)}% Gastado`;
+                badgeUSD.className = "text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-infoLight text-info";
+            }
+        };
+
+        window.toggleSaldo = function() {
+            window.saldosOcultos = !window.saldosOcultos;
+            const icon = document.getElementById('icon-ojo');
+            const ids = ['saldo-soles', 'saldo-dolares', 'flujo-ingresos-soles', 'flujo-egresos-soles', 'flujo-ingresos-dolares', 'flujo-egresos-dolares'];
+            if(window.saldosOcultos) {
+                icon.className = 'ph-fill ph-eye-slash text-xl';
+                ids.forEach(id => { const e=document.getElementById(id); if(e) e.innerText='••••••'; });
+            } else {
+                icon.className = 'ph-fill ph-eye text-xl';
+                ids.forEach(id => { const e=document.getElementById(id); if(e) e.innerText=e.getAttribute('data-valor'); });
+            }
+        };
+
+        // Biometría y Seguridad
+        window.pressPin = function(num) {
+            if(enteredPin.length < 4) { enteredPin += num; updatePinIndicators(); }
+            if(enteredPin.length === 4) setTimeout(evaluatePin, 100);
+        };
+
+        window.deletePin = function() {
+            if(enteredPin.length > 0) { enteredPin = enteredPin.slice(0, -1); updatePinIndicators(); }
+        };
+
+        function updatePinIndicators() {
+            const dots = document.getElementById('pin-indicators').children;
+            for(let i=0; i<4; i++) {
+                if(i < enteredPin.length) dots[i].classList.replace('bg-slate-700', 'bg-blue-500');
+                else { dots[i].classList.replace('bg-blue-500', 'bg-slate-700'); dots[i].classList.replace('bg-red-500', 'bg-slate-700'); }
+            }
+        }
+
+        function evaluatePin() {
+            if(currentPinMode === 'unlock') {
+                if(enteredPin === localStorage.getItem('app_pin')) {
+                    document.getElementById('view-lockscreen').classList.add('hidden'); initApp();
+                } else animarErrorPin();
+            } else if (currentPinMode === 'set') {
+                if(pendingSetPin === "") {
+                    pendingSetPin = enteredPin; enteredPin = ""; updatePinIndicators();
+                    document.getElementById('lock-title').innerText = "Confirma tu PIN";
+                } else {
+                    if(pendingSetPin === enteredPin) {
+                        localStorage.setItem('app_pin', enteredPin);
+                        document.getElementById('view-lockscreen').classList.add('hidden');
+                        document.getElementById('toggle-pin').checked = true;
+                        window.mostrarToast("PIN Activado", "bg-income", "ph-lock-key");
+                        if(!currentUser) initApp();
+                    } else {
+                        animarErrorPin(); pendingSetPin = ""; document.getElementById('lock-title').innerText = "Crea tu PIN de 4 dígitos";
+                    }
+                }
+            }
+        }
+
+        function animarErrorPin() {
+            const dots = document.getElementById('pin-indicators').children;
+            for(let i=0; i<4; i++) dots[i].classList.replace('bg-blue-500', 'bg-red-500');
+            document.getElementById('pin-indicators').classList.add('animate-shake');
+            setTimeout(() => { document.getElementById('pin-indicators').classList.remove('animate-shake'); enteredPin = ""; updatePinIndicators(); }, 400);
+        }
+
+        window.iniciarBiometria = async function() {
+            if(currentPinMode === 'set') return;
+            try {
+                const credIdBase64 = localStorage.getItem('bio_cred_id');
+                if(!credIdBase64) throw new Error("No hay credencial");
+                const challenge = new Uint8Array(32); window.crypto.getRandomValues(challenge);
+                const padding = '==='.slice((credIdBase64.length % 4 || 4) % 4);
+                const base64 = (credIdBase64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+                const str = atob(base64);
+                const buffer = new ArrayBuffer(str.length);
+                const bytes = new Uint8Array(buffer);
+                for (let i = 0; i < str.length; i++) bytes[i] = str.charCodeAt(i);
+
+                const getOptions = { publicKey: { challenge: challenge, allowCredentials: [{ id: buffer, type: 'public-key' }], userVerification: 'required', timeout: 60000 } };
+                const assertion = await navigator.credentials.get(getOptions);
+                if(assertion) { document.getElementById('view-lockscreen').classList.add('hidden'); initApp(); }
+            } catch (e) {
+                console.error("Biometría falló/cancelada:", e);
+            }
+        };
+
+        window.registrarBiometria = async function() {
+            try {
+                const challenge = new Uint8Array(32); window.crypto.getRandomValues(challenge);
+                const userId = new Uint8Array(16); window.crypto.getRandomValues(userId);
+                
+                const createOptions = {
+                    publicKey: {
+                        challenge: challenge, rp: { name: "Control Financiero Experto" },
+                        user: { id: userId, name: "usuario@app", displayName: "Usuario Local" },
+                        pubKeyCredParams: [{alg: -7, type: "public-key"}, {alg: -257, type: "public-key"}],
+                        authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
+                        timeout: 60000
+                    }
+                };
+
+                const credential = await navigator.credentials.create(createOptions);
+                const bytes = new Uint8Array(credential.rawId);
+                let str = '';
+                for (const charCode of bytes) str += String.fromCharCode(charCode);
+                const base64url = btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+                
+                localStorage.setItem('bio_cred_id', base64url);
+                localStorage.setItem('app_bio', 'true');
+                window.mostrarToast("FaceID / Huella Activado", "bg-income", "ph-face-id");
+            } catch (e) {
+                console.error(e);
+                document.getElementById('toggle-bio').checked = false;
+                if(e.name === 'NotAllowedError') {
+                    alert("La biometría no está permitida en este entorno por restricciones de privacidad del navegador actual.");
+                } else {
+                    alert("No se pudo activar la biometría o fue cancelada.");
+                }
+            }
+        };
+
+        window.abrirSettings = function() {
+            document.getElementById('modal-settings').classList.remove('hidden');
+            setTimeout(() => document.getElementById('modal-settings-content').classList.remove('translate-y-full'), 10);
+        };
+        window.cerrarSettings = function() {
+            document.getElementById('modal-settings-content').classList.add('translate-y-full');
+            setTimeout(() => document.getElementById('modal-settings').classList.add('hidden'), 300);
+        };
+        window.manejarTogglePin = function(checkbox) {
+            if(checkbox.checked) {
+                window.cerrarSettings(); currentPinMode = 'set'; pendingSetPin = ""; enteredPin = ""; updatePinIndicators();
+                document.getElementById('lock-title').innerText = "Crea tu PIN de 4 dígitos";
+                document.getElementById('btn-faceid').classList.add('invisible');
+                document.getElementById('view-lockscreen').classList.remove('hidden');
+            } else {
+                localStorage.removeItem('app_pin'); window.mostrarToast("PIN Desactivado", "bg-slate-800", "ph-lock-key");
+                localStorage.removeItem('app_bio'); document.getElementById('toggle-bio').checked = false;
+            }
+        };
+        window.manejarToggleBio = function(checkbox) {
+            if(checkbox.checked) {
+                if(!localStorage.getItem('app_pin')) { alert("Primero debes activar y crear un PIN de seguridad."); checkbox.checked = false; return; }
+                window.registrarBiometria();
+            } else {
+                localStorage.removeItem('app_bio'); localStorage.removeItem('bio_cred_id');
+                window.mostrarToast("Biometría Desactivada", "bg-slate-800", "ph-face-id");
+            }
+        };
+        window.cerrarSesionApp = async function() {
+            if(confirm("¿Estás seguro que deseas cerrar sesión? Tendrás que volver a ingresar para ver tus datos sincronizados.")) {
+                try {
+                    await signOut(auth);
+                    localStorage.removeItem('app_pin'); localStorage.removeItem('app_bio'); localStorage.removeItem('bio_cred_id');
+                    window.location.reload();
+                } catch(e) { console.error(e); }
+            }
+        };
+
+        // Modales Secundarios
+        window.validarTokenInput = function(input) {
+            input.value = input.value.replace(/[^0-9]/g, '');
+            const btn = document.getElementById('btn-confirmar-token');
+            if(input.value === window.tokenGeneradoActual) {
+                btn.disabled=false; btn.className='flex-1 bg-income text-white font-bold py-3 rounded-xl transition-colors text-[16px] shadow-md';
+            } else {
+                btn.disabled=true; btn.className='flex-1 bg-slate-300 text-slate-500 font-bold py-3 rounded-xl cursor-not-allowed transition-colors text-[16px]';
+            }
+        };
+        window.mostrarModalToken = function(idP, idC) {
+            window.cuotaPendientePago = {idP, idC};
+            window.tokenGeneradoActual = Math.floor(1000 + Math.random() * 9000).toString();
+            document.getElementById('token-generado').innerText = window.tokenGeneradoActual;
+            const input = document.getElementById('input-token-pago');
+            input.value = ''; window.validarTokenInput(input);
+            document.getElementById('modal-token').classList.remove('hidden');
+            setTimeout(() => document.getElementById('modal-token-content').classList.remove('scale-95'), 10);
+            setTimeout(() => input.focus(), 100);
+        };
+        window.cerrarModalToken = function() {
+            document.getElementById('modal-token-content').classList.add('scale-95');
+            setTimeout(() => document.getElementById('modal-token').classList.add('hidden'), 200);
+        };
+        
+        window.iniciarEliminarPrestamo = function() {
+            window.prestamoPendienteEliminar = window.prestamoActualVisualizando.id;
+            document.getElementById('input-pin-eliminar').value = '';
+            document.getElementById('modal-pin').classList.remove('hidden');
+            setTimeout(() => document.getElementById('modal-pin-content').classList.remove('scale-95'), 10);
+        };
+        window.cerrarModalPin = function() {
+            document.getElementById('modal-pin-content').classList.add('scale-95');
+            setTimeout(() => document.getElementById('modal-pin').classList.add('hidden'), 200);
+        };
+
+        window.renderHistorialUI = function() {
+            const lista = document.getElementById('lista-historial');
+            const btnVerMas = document.getElementById('btn-ver-mas-historial');
+            if(window.historialMovimientos.length === 0) {
+                lista.innerHTML = '<p class="text-center font-medium text-slate-400 py-4 text-[16px]">No hay movimientos.</p>';
+                btnVerMas.classList.add('hidden'); return;
+            }
+            lista.innerHTML = '';
+            const limite = window.maxHistorialVisible === 5 ? Math.min(5, window.historialMovimientos.length) : window.historialMovimientos.length;
+            for(let i=0; i<limite; i++) {
+                const mov = window.historialMovimientos[i];
+                const conf = catIcons[mov.cat] || {icon:'ph-check',color:'slate-500',bg:'slate-100'};
+                const div = document.createElement('div');
+                div.className = 'bg-white p-3 rounded-2xl shadow-sm flex items-center justify-between border border-slate-100 mb-2';
+                div.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-${conf.bg} text-${conf.color} flex items-center justify-center text-lg flex-shrink-0"><i class="ph-fill ${conf.icon}"></i></div>
+                        <div><h4 class="font-bold text-slate-800 text-[14px] truncate max-w-[150px] leading-tight">${mov.nom}</h4><p class="text-[10px] text-slate-400">${mov.fecha}</p></div>
+                    </div>
+                    <span class="font-bold text-[16px] ${mov.tipo==='ingreso'?'text-income':'text-expense'}">${mov.tipo==='ingreso'?'+':'-'} ${mov.moneda==='PEN'?'S/':'$'} ${window.formatMoney(mov.monto)}</span>
+                `;
+                lista.appendChild(div);
+            }
+            if(window.historialMovimientos.length > 5 && window.maxHistorialVisible === 5) {
+                btnVerMas.classList.remove('hidden'); btnVerMas.innerText = `Ver ${window.historialMovimientos.length - 5} más`;
+            } else if (window.maxHistorialVisible !== 5 && window.historialMovimientos.length > 5) {
+                btnVerMas.classList.remove('hidden'); btnVerMas.innerText = `Ocultar`;
+            } else { btnVerMas.classList.add('hidden'); }
+        };
+
+        window.verTodoElHistorial = function() {
+            window.maxHistorialVisible = window.maxHistorialVisible === 5 ? 'all' : 5;
+            window.renderHistorialUI();
+        };
+
+        window.abrirModalPrestamo = function() {
+            document.getElementById('modal-prestamo').classList.remove('hidden');
+            setTimeout(() => document.getElementById('modal-content').classList.remove('translate-y-full'), 10);
+            document.getElementById('check-temporal').checked = false;
+            window.togglePrestamoTemporal();
+        };
+        window.cerrarModalPrestamo = function() {
+            document.getElementById('modal-content').classList.add('translate-y-full');
+            setTimeout(() => {
+                document.getElementById('modal-prestamo').classList.add('hidden');
+                ['nombre','capital','porcentaje'].forEach(id => document.getElementById('nuevo-prestamo-'+id).value='');
+                document.getElementById('nuevo-prestamo-cuotas').value='1';
+            }, 300);
+        };
+
+        window.togglePrestamoTemporal = function() {
+            const isTemp = document.getElementById('check-temporal').checked;
+            const inPorc = document.getElementById('nuevo-prestamo-porcentaje');
+            const inFrec = document.getElementById('nuevo-prestamo-frecuencia');
+            const inCuotas = document.getElementById('nuevo-prestamo-cuotas');
+
+            if(isTemp) {
+                inPorc.value = "0"; inPorc.disabled = true; inPorc.classList.add('opacity-40');
+                inFrec.value = "Único"; inFrec.disabled = true; inFrec.classList.add('opacity-40');
+                inCuotas.value = "1"; inCuotas.disabled = true; inCuotas.classList.add('opacity-40');
+            } else {
+                inPorc.value = ""; inPorc.disabled = false; inPorc.classList.remove('opacity-40');
+                inFrec.value = "Semanal"; inFrec.disabled = false; inFrec.classList.remove('opacity-40');
+                inCuotas.value = "1"; inCuotas.disabled = false; inCuotas.classList.remove('opacity-40');
+            }
+            window.calcularPrestamoAuto();
+        };
+
+        window.calcularPrestamoAuto = function() {
+            const cap = parseFloat(document.getElementById('nuevo-prestamo-capital').value)||0;
+            const porc = parseFloat(document.getElementById('nuevo-prestamo-porcentaje').value)||0;
+            const cuotas = parseInt(document.getElementById('nuevo-prestamo-cuotas').value)||1;
+            const ganancia = cap * (porc/100);
+            const total = cap + ganancia;
+            const simb = window.monedaPrestamo === 'PEN' ? 'S/' : '$';
+            document.getElementById('calc-ganancia').innerText = `+ ${simb} ${window.formatMoney(ganancia)}`;
+            document.getElementById('calc-total').innerText = `${simb} ${window.formatMoney(total)}`;
+            document.getElementById('calc-cuota-monto').innerText = `Cuota: ${simb} ${window.formatMoney(total/cuotas)}`;
+        };
+
+        window.renderListaPrestamos = function() {
+            const lista = document.getElementById('lista-prestamos');
+            if(window.dbPrestamos.length===0){ lista.innerHTML = '<p class="text-center font-medium text-slate-400 py-10 text-[16px]">No hay préstamos activos.</p>'; return; }
+            lista.innerHTML='';
+            window.dbPrestamos.forEach(p => {
+                const pagadas = p.cuotas.filter(c=>c.pagada).length;
+                const totalPagado = pagadas * (p.total/p.numCuotas);
+                const restante = p.total - totalPagado;
+                const esLiquid = restante <= 0.01;
+                const simb = p.moneda === 'PEN' ? 'S/' : '$';
+                
+                const div = document.createElement('div');
+                div.className = `bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex items-center gap-3 relative overflow-hidden active:scale-[0.98] transition-all`;
+                div.onclick = () => window.abrirDetallePrestamo(p.id);
+                div.innerHTML = `
+                    <div class="w-1.5 h-full ${esLiquid?'bg-income':'bg-info'} absolute left-0 top-0"></div>
+                    <div class="w-12 h-12 rounded-full ${esLiquid?'bg-incomeLight text-income':'bg-infoLight text-info'} flex items-center justify-center text-2xl"><i class="ph-fill ph-user"></i></div>
+                    <div class="flex-1">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-bold text-slate-800 text-[16px]">${p.nombre} ${p.esTemporal?'<span class="text-[10px] text-slate-400">(Temp)</span>':''}</h3>
+                            <span class="text-[10px] font-bold ${esLiquid?'bg-incomeLight text-income':'bg-infoLight text-info'} px-1.5 py-0.5 rounded uppercase">${esLiquid?'Liquidado':'Activo'}</span>
+                        </div>
+                        <div class="flex justify-between items-end mt-1">
+                            <p class="text-[12px] text-slate-400 font-medium">${p.esTemporal?'Pago Único':`Pago ${p.frecuencia} • ${pagadas}/${p.numCuotas}`}</p>
+                            <p class="text-[16px] font-bold text-slate-700">Falta ${simb} ${window.formatMoney(Math.max(restante,0))}</p>
+                        </div>
+                    </div>
+                `;
+                lista.appendChild(div);
+            });
+        };
+
+        window.abrirDetallePrestamo = function(id) {
+            window.prestamoActualVisualizando = window.dbPrestamos.find(p=>p.id===id);
+            if(!window.prestamoActualVisualizando) return;
+            window.renderDetallePrestamoUI();
+            document.getElementById('modal-detalle-prestamo').classList.remove('hidden');
+            setTimeout(() => document.getElementById('modal-detalle-content').classList.remove('translate-y-full'), 10);
+        };
+        window.cerrarDetallePrestamo = function() {
+            document.getElementById('modal-detalle-content').classList.add('translate-y-full');
+            setTimeout(() => document.getElementById('modal-detalle-prestamo').classList.add('hidden'), 300);
+            window.prestamoActualVisualizando = null;
+        };
+
+        window.renderDetallePrestamoUI = function() {
+            const p = window.prestamoActualVisualizando;
+            document.getElementById('detalle-nombre').innerText = p.nombre;
+            const pagadas = p.cuotas.filter(c=>c.pagada).length;
+            const restante = p.total - (pagadas*(p.total/p.numCuotas));
+            const porc = (pagadas/p.numCuotas)*100;
+            const esLiquid = restante <= 0.01;
+            const simb = p.moneda === 'PEN' ? 'S/' : '$';
+            
+            document.getElementById('detalle-restante').innerText = esLiquid ? "Deuda Pagada" : `Falta ${simb} ${window.formatMoney(Math.max(restante, 0))}`;
+            document.getElementById('detalle-progreso-texto').innerText = `${pagadas} de ${p.numCuotas}`;
+            document.getElementById('detalle-porcentaje-texto').innerText = `${Math.round(porc)}%`;
+            document.getElementById('detalle-barra').style.width = `${porc}%`;
+
+            const btnEliminar = document.getElementById('btn-eliminar-prestamo');
+            if(esLiquid){
+                document.getElementById('detalle-estado').innerText="Liquidado";
+                btnEliminar.classList.remove('hidden'); 
+            } else {
+                document.getElementById('detalle-estado').innerText="Activo";
+                btnEliminar.classList.add('hidden');
+            }
+
+            const lista = document.getElementById('detalle-lista-cuotas');
+            lista.innerHTML='';
+            p.cuotas.forEach(c => {
+                const div = document.createElement('div');
+                div.className = `flex justify-between items-center p-4 rounded-xl border ${c.pagada?'bg-incomeLight/50 border-income text-income':'bg-slate-50 border-slate-200'}`;
+                div.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <i class="ph-fill ${c.pagada?'ph-check-circle text-2xl':'ph-circle text-slate-300 text-2xl'}"></i>
+                        <span class="text-[16px] font-bold">Cuota ${c.id} (${simb} ${window.formatMoney(c.monto)})</span>
+                    </div>
+                    ${!c.pagada ? `<button onclick="window.mostrarModalToken('${p.id}',${c.id})" class="bg-slate-800 text-white text-[12px] font-bold px-4 py-2 rounded-xl active:scale-95">Cobrar</button>` : `<span class="text-[12px] font-bold tracking-wide">PAGADO</span>`}
+                `;
+                lista.appendChild(div);
+            });
+        };
+
+        window.navigate = function(viewId, btn) {
+            ['registro', 'dashboard', 'prestamos', 'simuladores'].forEach(id => { document.getElementById('view-' + id).classList.add('hidden'); });
+            document.getElementById('view-' + viewId).classList.remove('hidden'); 
+            document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active'); el.querySelector('i').style.color='#94A3B8'; });
+            btn.classList.add('active');
+            const i = document.querySelector('.nav-item.active i');
+            if(viewId === 'registro') { if(i) i.style.color = window.tipoActual === 'ingreso' ? '#10B981' : '#F43F5E'; }
+            else { if(i) i.style.color = '#0F172A'; }
+        };
+
+        window.analizarInversion = function() {
+            const costo = parseFloat(document.getElementById('sim-inv-costo').value);
+            const meses = parseInt(document.getElementById('sim-inv-meses').value);
+            const res = document.getElementById('res-inversion');
+            if(!costo||!meses) { alert("Completa los datos de la compra"); return; }
+            const cuotaMensual = costo/meses;
+            const ingresosPromedio = window.state.ingresosSoles > 0 ? window.state.ingresosSoles : 1000; 
+            const porcentaje = (cuotaMensual / ingresosPromedio) * 100;
+            res.classList.remove('hidden','bg-emerald-50','bg-warningLight','bg-rose-50');
+            if(porcentaje < 20) { res.classList.add('bg-emerald-50'); res.innerHTML = `<p class="font-bold text-emerald-700 text-[16px]"><i class="ph-fill ph-check-circle mr-1"></i>Viable. Solo compromete el ${Math.round(porcentaje)}% de tus ingresos.</p>`; }
+            else if(porcentaje < 40) { res.classList.add('bg-warningLight'); res.innerHTML = `<p class="font-bold text-warning text-[16px]"><i class="ph-fill ph-warning mr-1"></i>Ajustado. Compromete el ${Math.round(porcentaje)}%. Reduce otros gastos.</p>`; }
+            else { res.classList.add('bg-rose-50'); res.innerHTML = `<p class="font-bold text-rose-700 text-[16px]"><i class="ph-fill ph-x-circle mr-1"></i>Riesgoso. Comprometería el ${Math.round(porcentaje)}% mensual.</p>`; }
+        };
+
+        window.analizarPrestamo = function() {
+            const cap = parseFloat(document.getElementById('sim-pre-capital').value);
+            const int = parseFloat(document.getElementById('sim-pre-interes').value);
+            const res = document.getElementById('res-prestamo');
+            if(!cap||isNaN(int)) { alert("Completa los datos del préstamo"); return; }
+            const porcentajeLiquidez = (cap / Math.max(window.state.soles, 1)) * 100;
+            const ganancia = cap * (int/100);
+            res.classList.remove('hidden','bg-emerald-50','bg-warningLight','bg-rose-50');
+            if(window.state.soles < cap) { res.classList.add('bg-rose-50'); res.innerHTML = `<p class="font-bold text-rose-700 text-[16px]"><i class="ph-fill ph-x-circle mr-1"></i>No tienes liquidez suficiente en Soles.</p>`; }
+            else if(porcentajeLiquidez > 40) { res.classList.add('bg-warningLight'); res.innerHTML = `<p class="font-bold text-warning text-[16px]"><i class="ph-fill ph-warning mr-1"></i>Arriesgado. Estás prestando el ${Math.round(porcentajeLiquidez)}% de tu efectivo. Ganancia: S/ ${window.formatMoney(ganancia)}.</p>`; }
+            else { res.classList.add('bg-emerald-50'); res.innerHTML = `<p class="font-bold text-emerald-700 text-[16px]"><i class="ph-fill ph-check-circle mr-1"></i>Saludable. Representa el ${Math.round(porcentajeLiquidez)}% de tu efectivo. Ganarás S/ ${window.formatMoney(ganancia)}.</p>`; }
+        };
+
+        window.generarPDF = function() {
+            const btn = document.getElementById('btn-generar-pdf');
+            btn.innerHTML = `<i class="ph ph-spinner animate-spin-slow text-xl"></i> Generando...`;
+            btn.classList.add('opacity-75', 'cursor-wait');
+
+            document.getElementById('pdf-mes').innerText = document.getElementById('select-mes-pdf').options[0].text;
+            document.getElementById('pdf-fecha-gen').innerText = window.getFechaActualStr();
+            document.getElementById('pdf-ing-sol').innerText = `S/ ${window.formatMoney(window.state.ingresosSoles)}`;
+            document.getElementById('pdf-egr-sol').innerText = `S/ ${window.formatMoney(window.state.egresosSoles)}`;
+            document.getElementById('pdf-liq-sol').innerText = `S/ ${window.formatMoney(window.state.soles)}`;
+            document.getElementById('pdf-ing-dol').innerText = `$ ${window.formatMoney(window.state.ingresosDolares)}`;
+            document.getElementById('pdf-egr-dol').innerText = `$ ${window.formatMoney(window.state.egresosDolares)}`;
+            document.getElementById('pdf-liq-dol').innerText = `$ ${window.formatMoney(window.state.dolares)}`;
+
+            const tbody = document.getElementById('pdf-tabla-body');
+            tbody.innerHTML = '';
+            if(window.historialMovimientos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-400">No hay movimientos registrados.</td></tr>';
+            } else {
+                window.historialMovimientos.forEach((mov, index) => {
+                    const row = document.createElement('tr');
+                    row.className = index % 2 === 0 ? 'bg-white border-b border-slate-100' : 'bg-slate-50 border-b border-slate-100';
+                    const simb = mov.moneda === 'PEN' ? 'S/' : '$';
+                    const color = mov.tipo === 'ingreso' ? 'text-income' : 'text-expense';
+                    const signo = mov.tipo === 'ingreso' ? '+' : '-';
+                    row.innerHTML = `
+                        <td class="p-3 text-slate-500">${mov.fecha}</td>
+                        <td class="p-3 font-bold text-slate-700">${mov.nom}</td>
+                        <td class="p-3"><span class="bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs">${mov.cat}</span></td>
+                        <td class="p-3 text-right font-bold ${color}">${signo} ${simb} ${window.formatMoney(mov.monto)}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+
+            const element = document.getElementById('pdf-template');
+            element.style.display = 'block';
+
+            const opt = {
+                margin:       [0.5, 0, 0.5, 0],
+                filename:     `Estado_de_Cuenta_${document.getElementById('select-mes-pdf').options[0].text.replace(' ','_')}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(element).save().then(() => {
+                element.style.display = 'none';
+                btn.innerHTML = `<i class="ph-fill ph-download-simple text-xl"></i> Descargar PDF`;
+                btn.classList.remove('opacity-75', 'cursor-wait');
+                window.mostrarToast("PDF Descargado Exitosamente", "bg-emerald-500", "ph-file-pdf");
+            }).catch(err => {
+                element.style.display = 'none';
+                btn.innerHTML = `<i class="ph-fill ph-download-simple text-xl"></i> Descargar PDF`;
+                btn.classList.remove('opacity-75', 'cursor-wait');
+                alert("Hubo un error al generar el PDF.");
+            });
+        };
+
+        // --- FUNCIONES DE BASE DE DATOS QUE DEPENDEN DE WINDOW ---
+        window.guardarRegistro = async function() {
+            const montoStr = document.getElementById('monto-input-visual').value.replace(/,/g, '');
+            const monto = parseFloat(montoStr) || 0;
+            if(monto <= 0 || !window.categoriaSeleccionada) { alert("Ingresa un monto y categoría validos."); return; }
+            if(!currentUser) { alert("Aún conectando a la Nube, por favor espera."); return; }
+
+            let catFinal = window.categoriaSeleccionada;
+            const nota = document.getElementById('nota-input').value.trim();
+            if(window.categoriaSeleccionada === 'Imprevisto') catFinal = document.getElementById('select-imprevisto').value;
+
+            if(window.tipoActual === 'ingreso') {
+                if(window.monedaRegistro === 'PEN') { window.state.soles += monto; window.state.ingresosSoles += monto; }
+                else { window.state.dolares += monto; window.state.ingresosDolares += monto; }
+            } else {
+                if(window.monedaRegistro === 'PEN') { window.state.soles -= monto; window.state.egresosSoles += monto; }
+                else { window.state.dolares -= monto; window.state.egresosDolares += monto; }
+            }
+            await saveStateToDB();
+
+            const nomHistorial = nota ? `${catFinal} (${nota})` : catFinal;
+            const histRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'historial');
+            await addDoc(histRef, {
+                fecha: window.getFechaActualStr(),
+                nom: nomHistorial, monto, tipo: window.tipoActual, cat: window.categoriaSeleccionada, moneda: window.monedaRegistro,
+                timestamp: Date.now()
+            });
+
+            window.mostrarToast(window.tipoActual === 'ingreso' ? 'Ingreso Guardado' : 'Egreso Guardado', window.tipoActual === 'ingreso' ? 'bg-income' : 'bg-expense', window.tipoActual === 'ingreso' ? 'ph-check' : 'ph-minus');
+
+            document.getElementById('monto-input-visual').value = '';
+            document.getElementById('nota-input').value = '';
+            document.getElementById('selector-imprevisto').classList.add('hidden');
+            document.querySelectorAll('.cat-btn').forEach(el => el.classList.remove('selected-income', 'selected-expense', 'selected-warning'));
+            window.categoriaSeleccionada = null;
+        };
+
+        window.confirmarPagoCuota = async function() {
+            if(document.getElementById('input-token-pago').value !== window.tokenGeneradoActual) return;
+            window.cerrarModalToken();
+            if(!currentUser) return;
+
+            const p = window.dbPrestamos.find(x=>x.id===window.cuotaPendientePago.idP);
+            const c = p.cuotas.find(x=>x.id===window.cuotaPendientePago.idC);
+            c.pagada = true;
+            
+            const pRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'prestamos', p.id);
+            await setDoc(pRef, p);
+
+            const capPorCuota = p.capital / p.numCuotas;
+            const intPorCuota = p.ganancia / p.numCuotas;
+
+            if(p.moneda === 'PEN') {
+                window.state.soles += c.monto; 
+                window.state.egresosSoles = Math.max(0, window.state.egresosSoles - capPorCuota); 
+                window.state.ingresosSoles += intPorCuota; 
+            } else {
+                window.state.dolares += c.monto;
+                window.state.egresosDolares = Math.max(0, window.state.egresosDolares - capPorCuota);
+                window.state.ingresosDolares += intPorCuota;
+            }
+            await saveStateToDB();
+
+            const histRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'historial');
+            await addDoc(histRef, {
+                fecha: window.getFechaActualStr(),
+                nom: `Cobro a ${p.nombre}`, monto: c.monto, tipo: 'ingreso', cat: 'Cobro', moneda: p.moneda,
+                timestamp: Date.now()
+            });
+
+            window.mostrarToast("Pago Verificado en Nube", "bg-income", "ph-check");
+        };
+
+        window.confirmarEliminarPrestamo = async function() {
+            const input = document.getElementById('input-pin-eliminar');
+            if(input.value !== '722056') { alert("PIN Incorrecto"); input.value=''; return; }
+            window.cerrarModalPin();
+            
+            if(currentUser && window.prestamoPendienteEliminar) {
+                const pRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'prestamos', window.prestamoPendienteEliminar);
+                await deleteDoc(pRef);
+            }
+            
+            window.cerrarDetallePrestamo();
+            window.mostrarToast("Préstamo Eliminado de Nube", "bg-slate-800", "ph-trash");
+        };
+
+        window.guardarPrestamo = async function() {
+            const nom = document.getElementById('nuevo-prestamo-nombre').value.trim();
+            const capStr = document.getElementById('nuevo-prestamo-capital').value;
+            const porcStr = document.getElementById('nuevo-prestamo-porcentaje').value;
+            const cuotasStr = document.getElementById('nuevo-prestamo-cuotas').value;
+            const isTemp = document.getElementById('check-temporal').checked;
+
+            if(!nom || !capStr || (!isTemp && (!porcStr || !cuotasStr))) { alert("Completa todos los campos obligatorios."); return; }
+            if(!currentUser) return;
+
+            const cap = parseFloat(capStr);
+            const porc = isTemp ? 0 : parseFloat(porcStr);
+            const cuotas = isTemp ? 1 : parseInt(cuotasStr);
+            const frec = isTemp ? 'Único' : document.getElementById('nuevo-prestamo-frecuencia').value;
+
+            const ganancia = cap * (porc/100);
+            const total = cap + ganancia;
+            const cuotaArr = Array.from({length:cuotas}, (_,i) => ({id:i+1, monto:total/cuotas, pagada:false}));
+            
+            const pId = Date.now().toString();
+            const nuevoP = { id: pId, moneda: window.monedaPrestamo, nombre:nom, capital:cap, ganancia, total, numCuotas:cuotas, frecuencia:frec, cuotas:cuotaArr, esTemporal: isTemp, timestamp: Date.now() };
+            
+            const pRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'prestamos', pId);
+            await setDoc(pRef, nuevoP);
+            
+            if(window.monedaPrestamo === 'PEN') { window.state.soles -= cap; window.state.egresosSoles += cap; }
+            else { window.state.dolares -= cap; window.state.egresosDolares += cap; }
+            await saveStateToDB();
+
+            const histRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'historial');
+            await addDoc(histRef, { fecha: window.getFechaActualStr(), nom: `Préstamo a ${nom}`, monto: cap, tipo: 'egreso', cat: 'Préstamo', moneda: window.monedaPrestamo, timestamp: Date.now() });
+            
+            window.cerrarModalPrestamo();
+            window.mostrarToast("Préstamo Generado", "bg-info", "ph-user-plus");
+        };
+
+        // SETUP LISTENERS AL FINAL
+        function setupListeners() {
+            if(!currentUser) return;
+            const stateRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'data', 'estado');
+            onSnapshot(stateRef, (docSnap) => {
+                if(docSnap.exists()) window.state = docSnap.data();
+                else setDoc(stateRef, window.state);
+                window.actualizarUI();
+            });
+
+            const histRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'historial');
+            onSnapshot(histRef, (snap) => {
+                const docs = []; snap.forEach(d => docs.push({ id: d.id, ...d.data() }));
+                window.historialMovimientos = docs.sort((a,b) => b.timestamp - a.timestamp);
+                window.renderHistorialUI();
+            });
+
+            const prestRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'prestamos');
+            onSnapshot(prestRef, (snap) => {
+                const docs = []; snap.forEach(d => docs.push({ id: d.id, ...d.data() }));
+                window.dbPrestamos = docs.sort((a,b) => b.timestamp - a.timestamp);
+                window.renderListaPrestamos();
+                if(window.prestamoActualVisualizando) {
+                    window.prestamoActualVisualizando = window.dbPrestamos.find(p=>p.id === window.prestamoActualVisualizando.id);
+                    if(window.prestamoActualVisualizando) window.renderDetallePrestamoUI();
+                    else window.cerrarDetallePrestamo();
+                }
+            });
+        }
+
+        async function saveStateToDB() {
+            if(!currentUser) return;
+            const stateRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'data', 'estado');
+            await setDoc(stateRef, window.state);
+        }
+
+        const initApp = async () => {
+            window.saldosOcultos = false; 
+            window.toggleSaldo(); 
+            window.actualizarUI();
+
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+                await signInAnonymously(auth);
+            }
+        };
+
+        // Lógica de arranque si no hay PIN o después de validar PIN
+        if(!HAS_PIN) {
+            document.addEventListener("DOMContentLoaded", () => {
+               // initApp happens inside DOMContentLoaded already based on conditions.
+               // We handle it directly up top with initApp().
+            });
+        }
+
+    </script>
+</body>
+</html>
