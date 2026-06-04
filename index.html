@@ -69,8 +69,6 @@
         .toast-animate { animation: slideUp 0.3s ease-out forwards; }
         @keyframes shake { 0%, 100% {transform: translateX(0);} 25% {transform: translateX(-10px);} 75% {transform: translateX(10px);} }
         .animate-shake { animation: shake 0.3s ease-in-out; }
-
-        #pdf-template { display: none; }
     </style>
 </head>
 <body class="font-sans antialiased h-[100dvh] flex flex-col relative selection:bg-incomeLight selection:text-income">
@@ -142,8 +140,8 @@
         </div>
     </div>
 
-    <!-- Plantilla Oculta para el PDF -->
-    <div id="pdf-template" class="p-8 bg-white text-slate-800 font-sans" style="width: 800px; display: none;">
+    <!-- Plantilla Oculta para el PDF (fuera de pantalla para evitar parpadeos) -->
+    <div id="pdf-template" class="p-8 bg-white text-slate-800 font-sans hidden w-[800px] absolute z-[-10] pointer-events-none">
         <div class="border-b-2 border-slate-200 pb-4 mb-6 flex justify-between items-end">
             <div>
                 <h1 class="text-3xl font-black text-slate-900 tracking-tight">Estado de Cuenta</h1>
@@ -440,7 +438,9 @@
                 <div class="bg-white rounded-[2rem] p-5 shadow-soft border border-slate-100">
                     <div class="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-xl flex items-center justify-center mb-3 text-2xl"><i class="ph-fill ph-file-pdf"></i></div>
                     <h3 class="font-bold text-lg text-slate-800 mb-2 leading-tight">Exportar Estado de Cuenta</h3>
-                    <select id="select-mes-pdf" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold focus:outline-none focus:border-emerald-500 mb-3 text-slate-700"></select>
+                    <select id="select-mes-pdf" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold focus:outline-none focus:border-emerald-500 mb-3 text-slate-700">
+                        <!-- Las opciones se poblarán con JS -->
+                    </select>
                     <button onclick="window.generarPDF()" id="btn-generar-pdf" class="w-full bg-emerald-500 text-white font-bold py-3.5 rounded-xl active:scale-95 transition-transform text-[16px] flex justify-center items-center gap-2 shadow-md">
                         <i class="ph-fill ph-download-simple text-xl"></i> Descargar PDF
                     </button>
@@ -498,7 +498,10 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appIdStr = 'control-finanzas-db'; 
+        
+        // Uso seguro del ID de la aplicación para guardar los datos
+        const appIdStr = typeof __app_id !== 'undefined' ? __app_id : 'control-finanzas-db'; 
+        
         let currentUser = null;
 
         window.tipoActual = 'ingreso'; 
@@ -516,13 +519,11 @@
         window.prestamoPendienteEliminar = null;
         window.tokenGeneradoActual = "";
 
-        let currentPinMode = 'unlock'; 
-        let pendingSetPin = "";
         let enteredPin = "";
         const CORRECT_PIN = '7220';
         const HAS_BIO = localStorage.getItem('app_bio') === 'true';
 
-        // SE CAMBIÓ A 'en-US' PARA USAR COMAS EN MILES Y PUNTO EN DECIMALES
+        // Formato Internacional Financiero: Comas para miles, punto para decimal
         window.formatMoney = (val) => Number(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         
         window.getFechaActualStr = () => {
@@ -615,37 +616,25 @@
             }
         };
 
-        // SE ACTUALIZÓ PARA USAR EL SISTEMA INTERNACIONAL (punto decimal, comas en miles)
         window.validarNumeroFormato = function(input) {
             let text = input.value;
-            // Limpiamos comas previas y cualquier caracter que no sea número o punto
-            text = text.replace(/,/g, '');
-            text = text.replace(/[^0-9.]/g, '');
+            text = text.replace(/,/g, '').replace(/[^0-9.]/g, '');
 
             let parts = text.split('.');
-            // Si hay más de un punto, nos quedamos solo con el primero
-            if(parts.length > 2) {
-                parts = [parts[0], parts.slice(1).join('')];
-            }
+            if(parts.length > 2) parts = [parts[0], parts.slice(1).join('')];
 
             let integerPart = parts[0];
             let decimalPart = parts.length > 1 ? parts[1] : '';
 
-            // Guardamos el raw con punto para que parseFloat lo entienda siempre en JS
             let raw = integerPart + (parts.length > 1 ? '.' + decimalPart : '');
             input.setAttribute('data-raw', raw);
 
             if(integerPart !== '') {
-                // Usamos toLocaleString en inglés para que ponga comas en los miles
                 integerPart = parseInt(integerPart, 10).toLocaleString('en-US');
                 input.value = integerPart + (parts.length > 1 ? '.' + decimalPart : '');
             } else {
                 input.value = '';
             }
-        };
-
-        window.validarNumero = function(input) {
-            window.validarNumeroFormato(input);
         };
 
         window.validarEntero = function(input) {
@@ -676,7 +665,8 @@
         function evaluatePin() {
             if(enteredPin === CORRECT_PIN) {
                 document.getElementById('view-lockscreen').classList.add('hidden');
-                if(currentUser) setupListeners(); else initApp();
+                if(currentUser) setupListeners();
+                enteredPin = ""; // Limpiamos el PIN tras entrada correcta
             } else {
                 const dots = document.getElementById('pin-indicators').children;
                 for(let i=0; i<4; i++) dots[i].classList.replace('bg-blue-500', 'bg-red-500');
@@ -701,7 +691,7 @@
                 const assertion = await navigator.credentials.get(getOptions);
                 if(assertion) { 
                     document.getElementById('view-lockscreen').classList.add('hidden'); 
-                    if(currentUser) setupListeners(); else initApp();
+                    if(currentUser) setupListeners();
                 }
             } catch (e) {
                 console.warn("Biometría omitida.");
@@ -1182,12 +1172,32 @@
             else { res.classList.add('bg-emerald-50'); res.innerHTML = `<p class="font-bold text-emerald-700 text-[16px]"><i class="ph-fill ph-check-circle mr-1"></i>Saludable. Representa el ${Math.round(porcentajeLiquidez)}% de tu efectivo. Ganarás S/ ${window.formatMoney(ganancia)}.</p>`; }
         };
 
+        // Poblar Selector de Meses para el PDF
+        const populateMonths = () => {
+            const select = document.getElementById('select-mes-pdf');
+            if(!select) return;
+            const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+            const d = new Date();
+            let currentMonth = d.getMonth();
+            let currentYear = d.getFullYear();
+            select.innerHTML = '';
+            for(let i=0; i<4; i++) {
+                let m = currentMonth - i;
+                let y = currentYear;
+                if(m < 0) { m += 12; y -= 1; }
+                const opt = document.createElement('option');
+                opt.value = `${months[m]} ${y}`;
+                opt.innerText = `${months[m]} ${y}`;
+                select.appendChild(opt);
+            }
+        };
+
         window.generarPDF = function() {
             const btn = document.getElementById('btn-generar-pdf');
             btn.innerHTML = `<i class="ph ph-spinner animate-spin text-xl"></i> Generando...`;
             btn.classList.add('opacity-75', 'cursor-wait');
 
-            document.getElementById('pdf-mes').innerText = document.getElementById('select-mes-pdf').options[0].text;
+            document.getElementById('pdf-mes').innerText = document.getElementById('select-mes-pdf').value;
             document.getElementById('pdf-fecha-gen').innerText = window.getFechaActualStr();
             document.getElementById('pdf-ing-sol').innerText = `S/ ${window.formatMoney(window.state.ingresosSoles)}`;
             document.getElementById('pdf-egr-sol').innerText = `S/ ${window.formatMoney(window.state.egresosSoles)}`;
@@ -1217,31 +1227,32 @@
                 });
             }
 
+            // Evitamos que salte la pantalla al mostrarlo
             const element = document.getElementById('pdf-template');
-            element.style.display = 'block';
+            element.classList.remove('hidden');
 
             const opt = {
                 margin:       [0.5, 0, 0.5, 0],
-                filename:     `Estado_de_Cuenta_${document.getElementById('select-mes-pdf').options[0].text.replace(' ','_')}.pdf`,
+                filename:     `Estado_de_Cuenta_${document.getElementById('select-mes-pdf').value.replace(' ','_')}.pdf`,
                 image:        { type: 'jpeg', quality: 0.98 },
                 html2canvas:  { scale: 2, useCORS: true },
                 jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
             };
 
             html2pdf().set(opt).from(element).save().then(() => {
-                element.style.display = 'none';
+                element.classList.add('hidden');
                 btn.innerHTML = `<i class="ph-fill ph-download-simple text-xl"></i> Descargar PDF`;
                 btn.classList.remove('opacity-75', 'cursor-wait');
                 window.mostrarToast("PDF Descargado Exitosamente", "bg-emerald-500", "ph-file-pdf");
             }).catch(err => {
-                element.style.display = 'none';
+                element.classList.add('hidden');
                 btn.innerHTML = `<i class="ph-fill ph-download-simple text-xl"></i> Descargar PDF`;
                 btn.classList.remove('opacity-75', 'cursor-wait');
                 alert("Hubo un error al generar el PDF.");
             });
         };
 
-        // --- FIREBASE LISTENERS ---
+        // --- FIREBASE LISTENERS (Con callbacks de error implementados) ---
         function setupListeners() {
             if(!currentUser) return;
 
@@ -1251,7 +1262,7 @@
                 if(docSnap.exists()) window.state = docSnap.data();
                 else setDoc(stateRef, window.state);
                 window.actualizarUI();
-            });
+            }, (error) => console.error("Error al obtener estado:", error));
 
             if(window.unsubscribeHist) window.unsubscribeHist();
             const histRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'historial');
@@ -1259,7 +1270,7 @@
                 const docs = []; snap.forEach(d => docs.push({ id: d.id, ...d.data() }));
                 window.historialMovimientos = docs.sort((a,b) => b.timestamp - a.timestamp);
                 window.renderHistorialUI();
-            });
+            }, (error) => console.error("Error al obtener historial:", error));
 
             if(window.unsubscribePrest) window.unsubscribePrest();
             const prestRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'prestamos');
@@ -1272,7 +1283,7 @@
                     if(window.prestamoActualVisualizando) window.renderDetallePrestamoUI();
                     else window.cerrarDetallePrestamo();
                 }
-            });
+            }, (error) => console.error("Error al obtener prestamos:", error));
         }
 
         async function saveStateToDB() {
@@ -1285,14 +1296,19 @@
             window.saldosOcultos = false; 
             window.toggleSaldo(); 
             window.actualizarUI();
+            populateMonths();
 
             try {
-                // Iniciar Firebase de Forma Anónima Silenciosa
-                await signInAnonymously(auth);
+                // Validación para uso de custom tokens en nube / local según requerimientos
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
             } catch (error) {
                 console.error("Auth Error:", error);
                 const overlay = document.getElementById('loading-overlay');
-                overlay.innerHTML = "<div class='text-center px-6'><i class='ph-fill ph-warning-circle text-5xl text-red-500 mb-2'></i><h2 class='text-red-500 font-bold text-xl'>Error de Conexión</h2><p class='text-slate-500 mt-2 text-sm'>Debes activar 'Anónimo' en Firebase Authentication -> Sign-in methods.</p></div>";
+                overlay.innerHTML = "<div class='text-center px-6'><i class='ph-fill ph-warning-circle text-5xl text-red-500 mb-2'></i><h2 class='text-red-500 font-bold text-xl'>Error de Conexión</h2><p class='text-slate-500 mt-2 text-sm'>Revisa tu configuración de autenticación de Firebase.</p></div>";
                 overlay.classList.remove('hidden');
             }
         };
@@ -1300,7 +1316,6 @@
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
-                // Solo cargar datos si el candado ya se quitó (por si la BD responde rápido)
                 if (document.getElementById('view-lockscreen').classList.contains('hidden')) {
                     setupListeners(); 
                 }
