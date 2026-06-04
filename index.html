@@ -293,7 +293,7 @@
                 <div class="text-center">
                     <div class="flex items-center justify-center gap-2">
                         <button id="btn-moneda-registro" onclick="window.toggleMonedaRegistro()" class="text-xl font-bold text-slate-800 bg-white rounded-lg px-3 py-1 shadow-sm active:scale-95 transition-all">S/</button>
-                        <input type="tel" inputmode="decimal" id="monto-input-visual" placeholder="0.00" oninput="window.formatInputValue(this)" class="monto-input-custom text-huge font-black text-white w-48 font-mono">
+                        <input type="tel" inputmode="decimal" id="monto-input-visual" placeholder="0.00" oninput="window.validarNumeroFormato(this)" class="monto-input-custom text-huge font-black text-white w-48 font-mono">
                     </div>
                 </div>
             </div>
@@ -484,7 +484,6 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, collection, onSnapshot, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // === 1. CONFIGURACIÓN FIREBASE EXACTA ===
         const userFirebaseConfig = {
             apiKey: "AIzaSyB2NjGDJSX1g-dPph8-_nKFtlfLliEqsCY",
             authDomain: "control-finanzas-f7e53.firebaseapp.com",
@@ -502,7 +501,6 @@
         const appIdStr = 'control-finanzas-db'; 
         let currentUser = null;
 
-        // === 2. ESTADOS GLOBALES ===
         window.tipoActual = 'ingreso'; 
         window.monedaRegistro = 'PEN';
         window.monedaPrestamo = 'PEN';
@@ -518,13 +516,12 @@
         window.prestamoPendienteEliminar = null;
         window.tokenGeneradoActual = "";
 
-        // SEGURIDAD LOCAL (PIN MAESTRO FIJO: 7220)
+        let currentPinMode = 'unlock'; 
+        let pendingSetPin = "";
         let enteredPin = "";
         const CORRECT_PIN = '7220';
         const HAS_BIO = localStorage.getItem('app_bio') === 'true';
 
-        // === 3. FUNCIONES EXPUESTAS (HOISTING) ===
-        // Formato Europeo/Latam: 1.000.000,00
         window.formatMoney = (val) => Number(val).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         window.getFechaActualStr = () => {
             const d = new Date();
@@ -556,7 +553,6 @@
             setTimeout(() => { toast.classList.remove('opacity-100'); setTimeout(() => toast.classList.add('hidden'), 300); }, 2000);
         };
 
-        // UI Y DASHBOARD
         window.actualizarUI = function() {
             const els = {
                 'saldo-soles': window.formatMoney(window.state.soles), 
@@ -617,10 +613,8 @@
             }
         };
 
-        // --- SISTEMA NUMÉRICO ROBUSTO (Maneja comas y puntos a la perfección) ---
         window.validarNumeroFormato = function(input) {
             let text = input.value;
-            // Detecta si presionaste punto para decimal, lo cambia a coma
             if(text.includes('.') && !text.includes(',')) {
                 if(text.endsWith('.')) text = text.slice(0, -1) + ',';
             }
@@ -654,7 +648,6 @@
             return parseFloat(raw) || 0; 
         }
 
-        // --- SEGURIDAD: BIOMETRÍA Y PIN MAESTRO ---
         window.pressPin = function(num) {
             if(enteredPin.length < 4) { enteredPin += num; updatePinIndicators(); }
             if(enteredPin.length === 4) setTimeout(evaluatePin, 100);
@@ -674,7 +667,6 @@
         function evaluatePin() {
             if(enteredPin === CORRECT_PIN) {
                 document.getElementById('view-lockscreen').classList.add('hidden');
-                // Al Desbloquear exitosamente, iniciamos la base de datos
                 if(currentUser) setupListeners(); else initApp();
             } else {
                 const dots = document.getElementById('pin-indicators').children;
@@ -740,7 +732,6 @@
             }
         };
 
-        // SETTINGS (Solo cierra sesión y biometría)
         window.abrirSettings = function() {
             document.getElementById('modal-settings').classList.remove('hidden');
             setTimeout(() => document.getElementById('modal-settings-content').classList.remove('translate-y-full'), 10);
@@ -763,7 +754,6 @@
             }
         };
 
-        // INTERFAZ REGISTRO
         window.setTipoRegistro = function(tipo) {
             window.tipoActual = tipo; window.categoriaSeleccionada = null;
             const header = document.getElementById('registro-header');
@@ -820,7 +810,6 @@
             }
         };
 
-        // ACCIONES PRINCIPALES
         window.guardarRegistro = async function() {
             const monto = getMontoRealDesde('monto-input-visual');
             if(monto <= 0 || !window.categoriaSeleccionada) { alert("Ingresa un monto válido y selecciona una categoría."); return; }
@@ -890,7 +879,6 @@
             window.renderHistorialUI();
         };
 
-        // PRÉSTAMOS
         window.abrirModalPrestamo = function() {
             document.getElementById('modal-prestamo').classList.remove('hidden');
             setTimeout(() => document.getElementById('modal-content').classList.remove('translate-y-full'), 10);
@@ -1162,7 +1150,7 @@
             const costo = getMontoRealDesde('sim-inv-costo');
             const meses = parseInt(document.getElementById('sim-inv-meses').value);
             const res = document.getElementById('res-inversion');
-            if(costo<=0||!meses) { alert("Completa los datos de la compra"); return; }
+            if(costo<=0||isNaN(meses)) { alert("Completa los datos de la compra"); return; }
             const cuotaMensual = costo/meses;
             const ingresosPromedio = window.state.ingresosSoles > 0 ? window.state.ingresosSoles : 1000; 
             const porcentaje = (cuotaMensual / ingresosPromedio) * 100;
@@ -1187,7 +1175,7 @@
 
         window.generarPDF = function() {
             const btn = document.getElementById('btn-generar-pdf');
-            btn.innerHTML = `<i class="ph ph-spinner animate-spin-slow text-xl"></i> Generando...`;
+            btn.innerHTML = `<i class="ph ph-spinner animate-spin text-xl"></i> Generando...`;
             btn.classList.add('opacity-75', 'cursor-wait');
 
             document.getElementById('pdf-mes').innerText = document.getElementById('select-mes-pdf').options[0].text;
