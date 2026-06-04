@@ -85,7 +85,7 @@
         <div class="bg-white w-full max-w-sm rounded-3xl p-8 shadow-2xl flex flex-col items-center">
             <div class="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center text-3xl mb-4"><i class="ph-fill ph-cloud-check"></i></div>
             <h2 class="text-xl font-black text-slate-800 mb-1">Cuenta en la Nube</h2>
-            <p class="text-sm text-slate-500 text-center mb-6">Inicia sesión para sincronizar tus datos en todos tus dispositivos.</p>
+            <p class="text-sm text-slate-500 text-center mb-6">Inicia sesión para sincronizar tus datos en tiempo real.</p>
 
             <input type="email" id="auth-email" placeholder="Correo electrónico" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 mb-3 focus:outline-none focus:border-blue-500 font-medium">
             <input type="password" id="auth-pass" placeholder="Contraseña" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 mb-6 focus:outline-none focus:border-blue-500 font-medium">
@@ -349,8 +349,12 @@
         <div id="view-dashboard" class="hidden flex flex-col h-full bg-bgLight">
             <div class="px-4 pt-6 pb-24 overflow-y-auto flex-1 space-y-4">
                 <div class="flex justify-between items-center mb-2">
-                    <div>
+                    <div class="flex items-center gap-2">
                         <h1 class="text-xl font-extrabold text-slate-800 tracking-tight" id="mes-actual">Resumen</h1>
+                        <!-- NUEVO: Indicador visual de Tiempo Real / Sincronización -->
+                        <span id="indicador-nube" class="flex items-center gap-1 text-[10px] bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full font-bold">
+                            <div class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div> Sincronizado
+                        </span>
                     </div>
                     <button onclick="window.abrirSettings()" class="bg-white p-2.5 rounded-full shadow-soft text-slate-600 hover:text-slate-800 transition-colors active:scale-95">
                         <i class="ph-fill ph-gear text-2xl"></i>
@@ -573,7 +577,22 @@
             setTimeout(() => { toast.classList.remove('opacity-100'); setTimeout(() => toast.classList.add('hidden'), 300); }, 2000);
         };
 
+        // Animación visual para confirmar que la BD está empujando datos en tiempo real
+        function parpadearIndicadorNube() {
+            const ind = document.getElementById('indicador-nube');
+            if(ind) {
+                ind.classList.remove('bg-emerald-100', 'text-emerald-600');
+                ind.classList.add('bg-blue-100', 'text-blue-600');
+                setTimeout(() => {
+                    ind.classList.remove('bg-blue-100', 'text-blue-600');
+                    ind.classList.add('bg-emerald-100', 'text-emerald-600');
+                }, 500);
+            }
+        }
+
         window.actualizarUI = function() {
+            parpadearIndicadorNube(); // Cuando Firebase detecta un cambio, hace parpadear el indicador
+
             const els = {
                 'saldo-soles': window.formatMoney(window.state.soles), 
                 'saldo-dolares': `$ ${window.formatMoney(window.state.dolares)}`,
