@@ -83,7 +83,7 @@
     </div>
 
     <!-- ================= PANTALLA DE BLOQUEO MAESTRA (PIN 7220 / FaceID) ================= -->
-    <div id="view-lockscreen" class="fixed inset-0 bg-slate-900 z-[300] hidden flex flex-col items-center justify-between py-16 transition-opacity duration-500">
+    <div id="view-lockscreen" class="fixed inset-0 bg-slate-900 z-[300] flex flex-col items-center justify-between py-16 transition-opacity duration-500">
         <div class="flex flex-col items-center mt-10">
             <i class="ph-fill ph-lock-key text-5xl text-blue-500 mb-6" id="lock-icon"></i>
             <h2 class="text-white text-xl font-bold mb-8 tracking-wide" id="lock-title">Ingresa tu PIN Maestro</h2>
@@ -325,7 +325,7 @@
                     </div>
                 </div>
                 <button id="btn-guardar" onclick="window.guardarRegistro()" class="w-full bg-income text-white font-bold py-4 rounded-2xl shadow-float active:scale-[0.98] transition-all flex justify-center items-center gap-2 mt-4 text-lg">
-                    <i class="ph-fill ph-cloud-arrow-up text-2xl"></i><span>Registrar en Nube</span>
+                    <i class="ph-fill ph-check-circle text-2xl"></i><span>Registrar en Nube</span>
                 </button>
             </div>
         </div>
@@ -478,16 +478,13 @@
         </button>
     </nav>
 
-    <!-- FIREBASE & CORE LOGIC UNIFIED -->
+    <!-- FIREBASE & JS INTEGRATION -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, collection, onSnapshot, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // ==========================================
-        // 1. CONFIGURACIÓN FIREBASE
-        // ==========================================
-        const firebaseConfig = {
+        const userFirebaseConfig = {
             apiKey: "AIzaSyB2NjGDJSX1g-dPph8-_nKFtlfLliEqsCY",
             authDomain: "control-finanzas-f7e53.firebaseapp.com",
             databaseURL: "https://control-finanzas-f7e53-default-rtdb.firebaseio.com",
@@ -497,30 +494,41 @@
             appId: "1:698737327266:web:f3e23f14e55de995652bfb"
         };
         
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : userFirebaseConfig;
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
         const appIdStr = 'control-finanzas-db'; 
         let currentUser = null;
 
-        // ==========================================
-        // 2. EXPOSICIÓN DE ESTADOS A NIVEL GLOBAL
-        // ==========================================
-        window.state = { soles: 0, dolares: 0, ingresosSoles: 0, egresosSoles: 0, ingresosDolares: 0, egresosDolares: 0 };
-        window.dbPrestamos = [];
-        window.historialMovimientos = [];
         window.tipoActual = 'ingreso'; 
         window.monedaRegistro = 'PEN';
         window.monedaPrestamo = 'PEN';
         window.categoriaSeleccionada = null;
         window.saldosOcultos = false; 
+        
+        window.state = { soles: 0, dolares: 0, ingresosSoles: 0, egresosSoles: 0, ingresosDolares: 0, egresosDolares: 0 };
+        window.dbPrestamos = [];
+        window.historialMovimientos = [];
         window.maxHistorialVisible = 5;
+
         window.cuotaPendientePago = null; 
         window.prestamoPendienteEliminar = null;
         window.tokenGeneradoActual = "";
 
+        let currentPinMode = 'unlock'; 
+        let pendingSetPin = "";
         let enteredPin = "";
         const CORRECT_PIN = '7220';
+        const HAS_BIO = localStorage.getItem('app_bio') === 'true';
+
+        // SE CAMBIÓ A 'en-US' PARA USAR COMAS EN MILES Y PUNTO EN DECIMALES
+        window.formatMoney = (val) => Number(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        
+        window.getFechaActualStr = () => {
+            const d = new Date();
+            return `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+        };
 
         const catIcons = {
             'Sueldo': { icon: 'ph-shield-check', color: 'income', bg: 'incomeLight' },
@@ -537,16 +545,6 @@
             'Cobro': { icon: 'ph-hand-coins', color: 'income', bg: 'incomeLight' }
         };
 
-        // ==========================================
-        // 3. FUNCIONES GLOBALES DE UTILIDAD
-        // ==========================================
-        window.formatMoney = (val) => Number(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        
-        window.getFechaActualStr = () => {
-            const d = new Date();
-            return `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
-        };
-
         window.mostrarToast = function(msg, bg, icon) {
             const toast = document.getElementById('toast-notif');
             document.getElementById('toast-content').className = `px-5 py-2.5 rounded-full font-bold text-white shadow-lg flex items-center gap-2 text-[16px] ${bg}`;
@@ -555,113 +553,6 @@
             toast.classList.remove('hidden'); toast.classList.add('opacity-100');
             document.getElementById('toast-content').classList.add('toast-animate');
             setTimeout(() => { toast.classList.remove('opacity-100'); setTimeout(() => toast.classList.add('hidden'), 300); }, 2000);
-        };
-
-        window.validarNumeroFormato = function(input) {
-            let text = input.value;
-            // Remover las comas para el cálculo puro
-            text = text.replace(/,/g, ''); 
-            
-            let parts = text.split('.');
-            if(parts.length > 2) parts = [parts[0], parts.slice(1).join('')];
-            
-            let integerPart = parts[0].replace(/[^0-9]/g, ''); 
-            let decimalPart = parts.length > 1 ? parts[1].replace(/[^0-9]/g, '') : '';
-            if(decimalPart.length > 2) decimalPart = decimalPart.substring(0, 2);
-            
-            let raw = integerPart + (parts.length > 1 ? '.' + decimalPart : '');
-            input.setAttribute('data-raw', raw || '0');
-
-            if(integerPart !== '') {
-                // Formato en-US inyecta las comas a los miles (Ej: 10,000)
-                integerPart = BigInt(integerPart).toLocaleString('en-US');
-                input.value = integerPart + (parts.length > 1 ? '.' + decimalPart : '');
-            } else {
-                input.value = '';
-            }
-        };
-
-        // Asignaciones directas para evitar errores en oninput de HTML
-        window.formatInputValue = window.validarNumeroFormato;
-        window.validarNumero = window.validarNumeroFormato;
-        window.validarEntero = function(input) { input.value = input.value.replace(/[^0-9]/g, ''); };
-        window.getMontoRealDesde = function(id) { 
-            const raw = document.getElementById(id).getAttribute('data-raw');
-            return parseFloat(raw) || 0; 
-        };
-
-        // ==========================================
-        // 4. FUNCIONES DE UI Y NAVEGACIÓN
-        // ==========================================
-        window.updateNavIconColor = function(c) {
-            const i = document.querySelector('.nav-item.active i');
-            const isRegistroView = document.getElementById('view-registro').classList.contains('hidden') === false;
-            if(c && i && isRegistroView) { i.style.color = c; } 
-            else if (i && !isRegistroView) { i.style.color = '#0F172A'; }
-        };
-
-        window.navigate = function(viewId, btn) {
-            ['registro', 'dashboard', 'prestamos', 'simuladores'].forEach(id => { document.getElementById('view-' + id).classList.add('hidden'); });
-            document.getElementById('view-' + viewId).classList.remove('hidden'); 
-            document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active'); el.querySelector('i').style.color='#94A3B8'; });
-            btn.classList.add('active');
-            window.updateNavIconColor(viewId === 'registro' ? (window.tipoActual === 'ingreso' ? '#10B981' : '#F43F5E') : null);
-        };
-
-        window.setTipoRegistro = function(tipo) {
-            window.tipoActual = tipo; window.categoriaSeleccionada = null;
-            const header = document.getElementById('registro-header');
-            document.querySelectorAll('.cat-btn').forEach(btn => btn.classList.remove('selected-income', 'selected-expense', 'selected-warning'));
-            document.getElementById('selector-imprevisto').classList.add('hidden');
-
-            if (tipo === 'ingreso') {
-                header.className = 'pt-5 pb-5 px-4 bg-income transition-colors duration-300 rounded-b-[2rem] shadow-md z-10 flex-shrink-0';
-                document.getElementById('btn-tab-ingreso').className = 'px-5 py-1.5 rounded-full text-[16px] font-bold bg-white text-income shadow-sm transition-all';
-                document.getElementById('btn-tab-egreso').className = 'px-5 py-1.5 rounded-full text-[16px] font-medium text-white/80 transition-all';
-                document.getElementById('grid-ingresos').classList.remove('hidden');
-                document.getElementById('grid-egresos').classList.add('hidden');
-                document.getElementById('btn-guardar').className = 'w-full bg-income text-white font-bold py-4 rounded-2xl shadow-float active:scale-[0.98] transition-all flex justify-center items-center gap-2 mt-4 text-lg';
-                window.updateNavIconColor('#10B981');
-            } else {
-                header.className = 'pt-5 pb-5 px-4 bg-expense transition-colors duration-300 rounded-b-[2rem] shadow-md z-10 flex-shrink-0';
-                document.getElementById('btn-tab-egreso').className = 'px-5 py-1.5 rounded-full text-[16px] font-bold bg-white text-expense shadow-sm transition-all';
-                document.getElementById('btn-tab-ingreso').className = 'px-5 py-1.5 rounded-full text-[16px] font-medium text-white/80 transition-all';
-                document.getElementById('grid-ingresos').classList.add('hidden');
-                document.getElementById('grid-egresos').classList.remove('hidden');
-                document.getElementById('btn-guardar').className = 'w-full bg-expense text-white font-bold py-4 rounded-2xl shadow-float active:scale-[0.98] transition-all flex justify-center items-center gap-2 mt-4 text-lg';
-                window.updateNavIconColor('#F43F5E');
-            }
-        };
-
-        window.toggleMonedaRegistro = function() {
-            window.monedaRegistro = window.monedaRegistro === 'PEN' ? 'USD' : 'PEN';
-            const btn = document.getElementById('btn-moneda-registro');
-            btn.innerText = window.monedaRegistro === 'PEN' ? 'S/' : '$';
-            btn.className = window.monedaRegistro === 'USD' 
-                ? 'text-xl font-bold text-amber-600 bg-amber-50 rounded-lg px-3 py-1 shadow-sm transition-colors'
-                : 'text-xl font-bold text-slate-800 bg-white rounded-lg px-3 py-1 shadow-sm transition-colors';
-        };
-
-        window.toggleMonedaPrestamo = function() {
-            window.monedaPrestamo = window.monedaPrestamo === 'PEN' ? 'USD' : 'PEN';
-            const btn = document.getElementById('btn-moneda-prestamo');
-            btn.innerText = window.monedaPrestamo === 'PEN' ? 'S/' : '$';
-            btn.className = window.monedaPrestamo === 'USD' 
-                ? 'text-[16px] font-bold text-amber-600 bg-amber-50 rounded-lg px-2 py-1 shadow-sm transition-colors'
-                : 'text-[16px] font-bold text-slate-800 bg-slate-100 rounded-lg px-2 py-1 shadow-sm transition-colors';
-        };
-
-        window.selectCategory = function(btn, tipoColor, nombreReal, esImprevisto = false) {
-            document.querySelectorAll('.cat-btn').forEach(el => el.classList.remove('selected-income', 'selected-expense', 'selected-warning'));
-            window.categoriaSeleccionada = nombreReal;
-            if (esImprevisto) {
-                btn.classList.add('selected-warning');
-                document.getElementById('selector-imprevisto').classList.remove('hidden');
-            } else {
-                document.getElementById('selector-imprevisto').classList.add('hidden');
-                if (tipoColor === 'income') btn.classList.add('selected-income');
-                if (tipoColor === 'expense') btn.classList.add('selected-expense');
-            }
         };
 
         window.actualizarUI = function() {
@@ -724,6 +615,244 @@
             }
         };
 
+        // SE ACTUALIZÓ PARA USAR EL SISTEMA INTERNACIONAL (punto decimal, comas en miles)
+        window.validarNumeroFormato = function(input) {
+            let text = input.value;
+            // Limpiamos comas previas y cualquier caracter que no sea número o punto
+            text = text.replace(/,/g, '');
+            text = text.replace(/[^0-9.]/g, '');
+
+            let parts = text.split('.');
+            // Si hay más de un punto, nos quedamos solo con el primero
+            if(parts.length > 2) {
+                parts = [parts[0], parts.slice(1).join('')];
+            }
+
+            let integerPart = parts[0];
+            let decimalPart = parts.length > 1 ? parts[1] : '';
+
+            // Guardamos el raw con punto para que parseFloat lo entienda siempre en JS
+            let raw = integerPart + (parts.length > 1 ? '.' + decimalPart : '');
+            input.setAttribute('data-raw', raw);
+
+            if(integerPart !== '') {
+                // Usamos toLocaleString en inglés para que ponga comas en los miles
+                integerPart = parseInt(integerPart, 10).toLocaleString('en-US');
+                input.value = integerPart + (parts.length > 1 ? '.' + decimalPart : '');
+            } else {
+                input.value = '';
+            }
+        };
+
+        window.validarNumero = function(input) {
+            window.validarNumeroFormato(input);
+        };
+
+        window.validarEntero = function(input) {
+            input.value = input.value.replace(/[^0-9]/g, '');
+        };
+
+        function getMontoRealDesde(id) { 
+            const raw = document.getElementById(id).getAttribute('data-raw');
+            return parseFloat(raw) || 0; 
+        }
+
+        window.pressPin = function(num) {
+            if(enteredPin.length < 4) { enteredPin += num; updatePinIndicators(); }
+            if(enteredPin.length === 4) setTimeout(evaluatePin, 100);
+        };
+        window.deletePin = function() {
+            if(enteredPin.length > 0) { enteredPin = enteredPin.slice(0, -1); updatePinIndicators(); }
+        };
+
+        function updatePinIndicators() {
+            const dots = document.getElementById('pin-indicators').children;
+            for(let i=0; i<4; i++) {
+                if(i < enteredPin.length) dots[i].classList.replace('bg-slate-700', 'bg-blue-500');
+                else { dots[i].classList.replace('bg-blue-500', 'bg-slate-700'); dots[i].classList.replace('bg-red-500', 'bg-slate-700'); }
+            }
+        }
+
+        function evaluatePin() {
+            if(enteredPin === CORRECT_PIN) {
+                document.getElementById('view-lockscreen').classList.add('hidden');
+                if(currentUser) setupListeners(); else initApp();
+            } else {
+                const dots = document.getElementById('pin-indicators').children;
+                for(let i=0; i<4; i++) dots[i].classList.replace('bg-blue-500', 'bg-red-500');
+                document.getElementById('pin-indicators').classList.add('animate-shake');
+                setTimeout(() => { document.getElementById('pin-indicators').classList.remove('animate-shake'); enteredPin = ""; updatePinIndicators(); }, 400);
+            }
+        }
+
+        window.iniciarBiometria = async function() {
+            try {
+                const credIdBase64 = localStorage.getItem('bio_cred_id');
+                if(!credIdBase64) throw new Error("No hay credencial");
+                const challenge = new Uint8Array(32); window.crypto.getRandomValues(challenge);
+                const padding = '==='.slice((credIdBase64.length % 4 || 4) % 4);
+                const base64 = (credIdBase64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+                const str = atob(base64);
+                const buffer = new ArrayBuffer(str.length);
+                const bytes = new Uint8Array(buffer);
+                for (let i = 0; i < str.length; i++) bytes[i] = str.charCodeAt(i);
+
+                const getOptions = { publicKey: { challenge: challenge, allowCredentials: [{ id: buffer, type: 'public-key' }], userVerification: 'required', timeout: 60000 } };
+                const assertion = await navigator.credentials.get(getOptions);
+                if(assertion) { 
+                    document.getElementById('view-lockscreen').classList.add('hidden'); 
+                    if(currentUser) setupListeners(); else initApp();
+                }
+            } catch (e) {
+                console.warn("Biometría omitida.");
+            }
+        };
+
+        window.registrarBiometria = async function() {
+            try {
+                const challenge = new Uint8Array(32); window.crypto.getRandomValues(challenge);
+                const userId = new Uint8Array(16); window.crypto.getRandomValues(userId);
+                const createOptions = {
+                    publicKey: {
+                        challenge: challenge, rp: { name: "Control Financiero Experto" },
+                        user: { id: userId, name: "usuario@app", displayName: "Usuario Local" },
+                        pubKeyCredParams: [{alg: -7, type: "public-key"}, {alg: -257, type: "public-key"}],
+                        authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
+                        timeout: 60000
+                    }
+                };
+                const credential = await navigator.credentials.create(createOptions);
+                const bytes = new Uint8Array(credential.rawId);
+                let str = '';
+                for (const charCode of bytes) str += String.fromCharCode(charCode);
+                const base64url = btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+                
+                localStorage.setItem('bio_cred_id', base64url);
+                localStorage.setItem('app_bio', 'true');
+                window.mostrarToast("FaceID / Huella Activado", "bg-income", "ph-face-id");
+            } catch (e) {
+                console.warn(e);
+                document.getElementById('toggle-bio').checked = false;
+                if(e.name === 'NotAllowedError') {
+                    window.mostrarToast("Biometría bloqueada en este navegador.", "bg-warning", "ph-warning");
+                } else {
+                    window.mostrarToast("Error activando biometría.", "bg-expense", "ph-x");
+                }
+            }
+        };
+
+        window.abrirSettings = function() {
+            document.getElementById('modal-settings').classList.remove('hidden');
+            setTimeout(() => document.getElementById('modal-settings-content').classList.remove('translate-y-full'), 10);
+        };
+        window.cerrarSettings = function() {
+            document.getElementById('modal-settings-content').classList.add('translate-y-full');
+            setTimeout(() => document.getElementById('modal-settings').classList.add('hidden'), 300);
+        };
+        window.manejarToggleBio = function(checkbox) {
+            if(checkbox.checked) {
+                window.registrarBiometria();
+            } else {
+                localStorage.removeItem('app_bio'); localStorage.removeItem('bio_cred_id');
+                window.mostrarToast("Biometría Desactivada", "bg-slate-800", "ph-face-id");
+            }
+        };
+        window.cerrarSesionApp = async function() {
+            if(confirm("¿Estás seguro que deseas cerrar sesión? Borrarás el acceso a la nube.")) {
+                try { await signOut(auth); window.location.reload(); } catch(e) { console.error(e); }
+            }
+        };
+
+        window.setTipoRegistro = function(tipo) {
+            window.tipoActual = tipo; window.categoriaSeleccionada = null;
+            const header = document.getElementById('registro-header');
+            document.querySelectorAll('.cat-btn').forEach(btn => btn.classList.remove('selected-income', 'selected-expense', 'selected-warning'));
+            document.getElementById('selector-imprevisto').classList.add('hidden');
+
+            if (tipo === 'ingreso') {
+                header.className = 'pt-5 pb-5 px-4 bg-income transition-colors duration-300 rounded-b-[2rem] shadow-md z-10 flex-shrink-0';
+                document.getElementById('btn-tab-ingreso').className = 'px-5 py-1.5 rounded-full text-[16px] font-bold bg-white text-income shadow-sm transition-all';
+                document.getElementById('btn-tab-egreso').className = 'px-5 py-1.5 rounded-full text-[16px] font-medium text-white/80 transition-all';
+                document.getElementById('grid-ingresos').classList.remove('hidden');
+                document.getElementById('grid-egresos').classList.add('hidden');
+                document.getElementById('btn-guardar').className = 'w-full bg-income text-white font-bold py-4 rounded-2xl shadow-float active:scale-[0.98] transition-all flex justify-center items-center gap-2 mt-4 text-lg';
+                window.updateNavIconColor('#10B981');
+            } else {
+                header.className = 'pt-5 pb-5 px-4 bg-expense transition-colors duration-300 rounded-b-[2rem] shadow-md z-10 flex-shrink-0';
+                document.getElementById('btn-tab-egreso').className = 'px-5 py-1.5 rounded-full text-[16px] font-bold bg-white text-expense shadow-sm transition-all';
+                document.getElementById('btn-tab-ingreso').className = 'px-5 py-1.5 rounded-full text-[16px] font-medium text-white/80 transition-all';
+                document.getElementById('grid-ingresos').classList.add('hidden');
+                document.getElementById('grid-egresos').classList.remove('hidden');
+                document.getElementById('btn-guardar').className = 'w-full bg-expense text-white font-bold py-4 rounded-2xl shadow-float active:scale-[0.98] transition-all flex justify-center items-center gap-2 mt-4 text-lg';
+                window.updateNavIconColor('#F43F5E');
+            }
+        };
+
+        window.toggleMonedaRegistro = function() {
+            window.monedaRegistro = window.monedaRegistro === 'PEN' ? 'USD' : 'PEN';
+            const btn = document.getElementById('btn-moneda-registro');
+            btn.innerText = window.monedaRegistro === 'PEN' ? 'S/' : '$';
+            btn.className = window.monedaRegistro === 'USD' 
+                ? 'text-xl font-bold text-amber-600 bg-amber-50 rounded-lg px-3 py-1 shadow-sm transition-colors'
+                : 'text-xl font-bold text-slate-800 bg-white rounded-lg px-3 py-1 shadow-sm transition-colors';
+        };
+
+        window.toggleMonedaPrestamo = function() {
+            window.monedaPrestamo = window.monedaPrestamo === 'PEN' ? 'USD' : 'PEN';
+            const btn = document.getElementById('btn-moneda-prestamo');
+            btn.innerText = window.monedaPrestamo === 'PEN' ? 'S/' : '$';
+            btn.className = window.monedaPrestamo === 'USD' 
+                ? 'text-[16px] font-bold text-amber-600 bg-amber-50 rounded-lg px-2 py-1 shadow-sm transition-colors'
+                : 'text-[16px] font-bold text-slate-800 bg-slate-100 rounded-lg px-2 py-1 shadow-sm transition-colors';
+        };
+
+        window.selectCategory = function(btn, tipoColor, nombreReal, esImprevisto = false) {
+            document.querySelectorAll('.cat-btn').forEach(el => el.classList.remove('selected-income', 'selected-expense', 'selected-warning'));
+            window.categoriaSeleccionada = nombreReal;
+            if (esImprevisto) {
+                btn.classList.add('selected-warning');
+                document.getElementById('selector-imprevisto').classList.remove('hidden');
+            } else {
+                document.getElementById('selector-imprevisto').classList.add('hidden');
+                if (tipoColor === 'income') btn.classList.add('selected-income');
+                if (tipoColor === 'expense') btn.classList.add('selected-expense');
+            }
+        };
+
+        window.guardarRegistro = async function() {
+            const monto = getMontoRealDesde('monto-input-visual');
+            if(monto <= 0 || !window.categoriaSeleccionada) { alert("Ingresa un monto válido y selecciona una categoría."); return; }
+            if(!currentUser) { alert("Aún conectando a la Nube. Espere un segundo."); return; }
+
+            let catFinal = window.categoriaSeleccionada;
+            const nota = document.getElementById('nota-input').value.trim();
+            if(window.categoriaSeleccionada === 'Imprevisto') catFinal = document.getElementById('select-imprevisto').value;
+
+            if(window.tipoActual === 'ingreso') {
+                if(window.monedaRegistro === 'PEN') { window.state.soles += monto; window.state.ingresosSoles += monto; }
+                else { window.state.dolares += monto; window.state.ingresosDolares += monto; }
+            } else {
+                if(window.monedaRegistro === 'PEN') { window.state.soles -= monto; window.state.egresosSoles += monto; }
+                else { window.state.dolares -= monto; window.state.egresosDolares += monto; }
+            }
+            await saveStateToDB();
+
+            const nomHistorial = nota ? `${catFinal} (${nota})` : catFinal;
+            const histRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'historial');
+            await addDoc(histRef, {
+                fecha: window.getFechaActualStr(), nom: nomHistorial, monto, tipo: window.tipoActual, cat: window.categoriaSeleccionada, moneda: window.monedaRegistro, timestamp: Date.now()
+            });
+
+            window.mostrarToast(window.tipoActual === 'ingreso' ? 'Ingreso Guardado' : 'Egreso Guardado', window.tipoActual === 'ingreso' ? 'bg-income' : 'bg-expense', window.tipoActual === 'ingreso' ? 'ph-check' : 'ph-minus');
+
+            document.getElementById('monto-input-visual').value = '';
+            document.getElementById('monto-input-visual').setAttribute('data-raw', '0');
+            document.getElementById('nota-input').value = '';
+            document.getElementById('selector-imprevisto').classList.add('hidden');
+            document.querySelectorAll('.cat-btn').forEach(el => el.classList.remove('selected-income', 'selected-expense', 'selected-warning'));
+            window.categoriaSeleccionada = null;
+        };
+
         window.renderHistorialUI = function() {
             const lista = document.getElementById('lista-historial');
             const btnVerMas = document.getElementById('btn-ver-mas-historial');
@@ -759,115 +888,6 @@
             window.renderHistorialUI();
         };
 
-        // ==========================================
-        // 5. SEGURIDAD Y AJUSTES
-        // ==========================================
-        window.pressPin = function(num) {
-            if(enteredPin.length < 4) { enteredPin += num; updatePinIndicators(); }
-            if(enteredPin.length === 4) setTimeout(evaluatePin, 100);
-        };
-        window.deletePin = function() {
-            if(enteredPin.length > 0) { enteredPin = enteredPin.slice(0, -1); updatePinIndicators(); }
-        };
-
-        function updatePinIndicators() {
-            const dots = document.getElementById('pin-indicators').children;
-            for(let i=0; i<4; i++) {
-                if(i < enteredPin.length) dots[i].classList.replace('bg-slate-700', 'bg-blue-500');
-                else { dots[i].classList.replace('bg-blue-500', 'bg-slate-700'); dots[i].classList.replace('bg-red-500', 'bg-slate-700'); }
-            }
-        }
-
-        function evaluatePin() {
-            if(enteredPin === CORRECT_PIN) {
-                document.getElementById('view-lockscreen').classList.add('hidden');
-                iniciarFirebaseYDatos();
-            } else {
-                const dots = document.getElementById('pin-indicators').children;
-                for(let i=0; i<4; i++) dots[i].classList.replace('bg-blue-500', 'bg-red-500');
-                document.getElementById('pin-indicators').classList.add('animate-shake');
-                setTimeout(() => { document.getElementById('pin-indicators').classList.remove('animate-shake'); enteredPin = ""; updatePinIndicators(); }, 400);
-            }
-        }
-
-        window.iniciarBiometria = async function() {
-            try {
-                const credIdBase64 = localStorage.getItem('bio_cred_id');
-                if(!credIdBase64) throw new Error("No hay credencial");
-                const challenge = new Uint8Array(32); window.crypto.getRandomValues(challenge);
-                const padding = '==='.slice((credIdBase64.length % 4 || 4) % 4);
-                const base64 = (credIdBase64 + padding).replace(/-/g, "+").replace(/_/g, "/");
-                const str = atob(base64);
-                const buffer = new ArrayBuffer(str.length);
-                const bytes = new Uint8Array(buffer);
-                for (let i = 0; i < str.length; i++) bytes[i] = str.charCodeAt(i);
-
-                const getOptions = { publicKey: { challenge: challenge, allowCredentials: [{ id: buffer, type: 'public-key' }], userVerification: 'required', timeout: 60000 } };
-                const assertion = await navigator.credentials.get(getOptions);
-                if(assertion) { 
-                    document.getElementById('view-lockscreen').classList.add('hidden'); 
-                    iniciarFirebaseYDatos();
-                }
-            } catch (e) {
-                console.warn("Biometría falló/omitida.");
-            }
-        };
-
-        window.registrarBiometria = async function() {
-            try {
-                const challenge = new Uint8Array(32); window.crypto.getRandomValues(challenge);
-                const userId = new Uint8Array(16); window.crypto.getRandomValues(userId);
-                
-                const createOptions = {
-                    publicKey: {
-                        challenge: challenge, rp: { name: "Control Financiero Experto" },
-                        user: { id: userId, name: "usuario@app", displayName: "Usuario Local" },
-                        pubKeyCredParams: [{alg: -7, type: "public-key"}, {alg: -257, type: "public-key"}],
-                        authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
-                        timeout: 60000
-                    }
-                };
-
-                const credential = await navigator.credentials.create(createOptions);
-                const bytes = new Uint8Array(credential.rawId);
-                let str = '';
-                for (const charCode of bytes) str += String.fromCharCode(charCode);
-                const base64url = btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
-                
-                localStorage.setItem('bio_cred_id', base64url);
-                localStorage.setItem('app_bio', 'true');
-                window.mostrarToast("FaceID / Huella Activado", "bg-income", "ph-face-id");
-            } catch (e) {
-                document.getElementById('toggle-bio').checked = false;
-                window.mostrarToast("Error activando biometría.", "bg-warning", "ph-warning");
-            }
-        };
-
-        window.abrirSettings = function() {
-            document.getElementById('modal-settings').classList.remove('hidden');
-            setTimeout(() => document.getElementById('modal-settings-content').classList.remove('translate-y-full'), 10);
-        };
-        window.cerrarSettings = function() {
-            document.getElementById('modal-settings-content').classList.add('translate-y-full');
-            setTimeout(() => document.getElementById('modal-settings').classList.add('hidden'), 300);
-        };
-        window.manejarToggleBio = function(checkbox) {
-            if(checkbox.checked) {
-                window.registrarBiometria();
-            } else {
-                localStorage.removeItem('app_bio'); localStorage.removeItem('bio_cred_id');
-                window.mostrarToast("Biometría Desactivada", "bg-slate-800", "ph-face-id");
-            }
-        };
-        window.cerrarSesionApp = async function() {
-            if(confirm("¿Estás seguro que deseas cerrar sesión? Borrarás el acceso local.")) {
-                try { await signOut(auth); localStorage.removeItem('app_bio'); localStorage.removeItem('bio_cred_id'); window.location.reload(); } catch(e) { console.error(e); }
-            }
-        };
-
-        // ==========================================
-        // 6. FLUJO PRÉSTAMOS
-        // ==========================================
         window.abrirModalPrestamo = function() {
             document.getElementById('modal-prestamo').classList.remove('hidden');
             setTimeout(() => document.getElementById('modal-content').classList.remove('translate-y-full'), 10);
@@ -903,8 +923,8 @@
             window.calcularPrestamoAuto();
         };
         window.calcularPrestamoAuto = function() {
-            const cap = window.getMontoRealDesde('nuevo-prestamo-capital');
-            const porc = window.getMontoRealDesde('nuevo-prestamo-porcentaje');
+            const cap = getMontoRealDesde('nuevo-prestamo-capital');
+            const porc = getMontoRealDesde('nuevo-prestamo-porcentaje');
             const cuotas = parseInt(document.getElementById('nuevo-prestamo-cuotas').value)||1;
             const ganancia = cap * (porc/100);
             const total = cap + ganancia;
@@ -912,6 +932,40 @@
             document.getElementById('calc-ganancia').innerText = `+ ${simb} ${window.formatMoney(ganancia)}`;
             document.getElementById('calc-total').innerText = `${simb} ${window.formatMoney(total)}`;
             document.getElementById('calc-cuota-monto').innerText = `Cuota: ${simb} ${window.formatMoney(total/cuotas)}`;
+        };
+
+        window.guardarPrestamo = async function() {
+            const nom = document.getElementById('nuevo-prestamo-nombre').value.trim();
+            const cap = getMontoRealDesde('nuevo-prestamo-capital');
+            const porc = getMontoRealDesde('nuevo-prestamo-porcentaje');
+            const cuotasStr = document.getElementById('nuevo-prestamo-cuotas').value;
+            const isTemp = document.getElementById('check-temporal').checked;
+
+            if(!nom || cap <= 0 || (!isTemp && (!cuotasStr))) { alert("Completa todos los campos obligatorios."); return; }
+            if(!currentUser) { alert("Aún conectando a la Nube."); return; }
+
+            const cuotas = isTemp ? 1 : parseInt(cuotasStr);
+            const frec = isTemp ? 'Único' : document.getElementById('nuevo-prestamo-frecuencia').value;
+
+            const ganancia = cap * (porc/100);
+            const total = cap + ganancia;
+            const cuotaArr = Array.from({length:cuotas}, (_,i) => ({id:i+1, monto:total/cuotas, pagada:false}));
+            
+            const pId = Date.now().toString();
+            const nuevoP = { id: pId, moneda: window.monedaPrestamo, nombre:nom, capital:cap, ganancia, total, numCuotas:cuotas, frecuencia:frec, cuotas:cuotaArr, esTemporal: isTemp, timestamp: Date.now() };
+            
+            const pRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'prestamos', pId);
+            await setDoc(pRef, nuevoP);
+            
+            if(window.monedaPrestamo === 'PEN') { window.state.soles -= cap; window.state.egresosSoles += cap; }
+            else { window.state.dolares -= cap; window.state.egresosDolares += cap; }
+            await saveStateToDB();
+
+            const histRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'historial');
+            await addDoc(histRef, { fecha: window.getFechaActualStr(), nom: `Préstamo a ${nom}`, monto: cap, tipo: 'egreso', cat: 'Préstamo', moneda: window.monedaPrestamo, timestamp: Date.now() });
+            
+            window.cerrarModalPrestamo();
+            window.mostrarToast("Préstamo Generado", "bg-info", "ph-user-plus");
         };
 
         window.renderListaPrestamos = function() {
@@ -1021,6 +1075,42 @@
             document.getElementById('modal-token-content').classList.add('scale-95');
             setTimeout(() => document.getElementById('modal-token').classList.add('hidden'), 200);
         };
+        window.confirmarPagoCuota = async function() {
+            if(document.getElementById('input-token-pago').value !== window.tokenGeneradoActual) return;
+            window.cerrarModalToken();
+            if(!currentUser) return;
+
+            const p = window.dbPrestamos.find(x=>x.id===window.cuotaPendientePago.idP);
+            const c = p.cuotas.find(x=>x.id===window.cuotaPendientePago.idC);
+            c.pagada = true;
+            
+            const pRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'prestamos', p.id);
+            await setDoc(pRef, p);
+
+            const capPorCuota = p.capital / p.numCuotas;
+            const intPorCuota = p.ganancia / p.numCuotas;
+
+            if(p.moneda === 'PEN') {
+                window.state.soles += c.monto; 
+                window.state.egresosSoles = Math.max(0, window.state.egresosSoles - capPorCuota); 
+                window.state.ingresosSoles += intPorCuota; 
+            } else {
+                window.state.dolares += c.monto;
+                window.state.egresosDolares = Math.max(0, window.state.egresosDolares - capPorCuota);
+                window.state.ingresosDolares += intPorCuota;
+            }
+            await saveStateToDB();
+
+            const histRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'historial');
+            await addDoc(histRef, {
+                fecha: window.getFechaActualStr(),
+                nom: `Cobro a ${p.nombre}`, monto: c.monto, tipo: 'ingreso', cat: 'Cobro', moneda: p.moneda,
+                timestamp: Date.now()
+            });
+
+            window.mostrarToast("Pago Verificado en Nube", "bg-income", "ph-check");
+        };
+
         window.iniciarEliminarPrestamo = function() {
             window.prestamoPendienteEliminar = window.prestamoActualVisualizando.id;
             document.getElementById('input-pin-eliminar').value = '';
@@ -1031,12 +1121,42 @@
             document.getElementById('modal-pin-content').classList.add('scale-95');
             setTimeout(() => document.getElementById('modal-pin').classList.add('hidden'), 200);
         };
+        window.confirmarEliminarPrestamo = async function() {
+            const input = document.getElementById('input-pin-eliminar');
+            if(input.value !== '722056') { alert("PIN Incorrecto"); input.value=''; return; }
+            window.cerrarModalPin();
+            
+            if(currentUser && window.prestamoPendienteEliminar) {
+                const pRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'prestamos', window.prestamoPendienteEliminar);
+                await deleteDoc(pRef);
+            }
+            
+            window.cerrarDetallePrestamo();
+            window.mostrarToast("Préstamo Eliminado de Nube", "bg-slate-800", "ph-trash");
+        };
 
-        // ==========================================
-        // 7. SIMULADORES Y PDF
-        // ==========================================
+        window.navigate = function(viewId, btn) {
+            ['registro', 'dashboard', 'prestamos', 'simuladores'].forEach(id => { document.getElementById('view-' + id).classList.add('hidden'); });
+            document.getElementById('view-' + viewId).classList.remove('hidden'); 
+            document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active'); el.querySelector('i').style.color='#94A3B8'; });
+            btn.classList.add('active');
+            window.updateNavIconColor(viewId === 'registro' ? (window.tipoActual === 'ingreso' ? '#10B981' : '#F43F5E') : null);
+        };
+        window.updateNavIconColor = function(c) {
+            const i = document.querySelector('.nav-item.active i');
+            const isRegistroView = document.getElementById('view-registro').classList.contains('hidden') === false;
+            if(c && i && isRegistroView) {
+                i.style.color = c; 
+            } else if (i && !isRegistroView) {
+                i.style.color = '#0F172A'; 
+            }
+        };
+
+        // LLAMADA INICIAL DE ESTILO DE ICONO AL CARGAR
+        window.updateNavIconColor('#10B981');
+
         window.analizarInversion = function() {
-            const costo = window.getMontoRealDesde('sim-inv-costo');
+            const costo = getMontoRealDesde('sim-inv-costo');
             const meses = parseInt(document.getElementById('sim-inv-meses').value);
             const res = document.getElementById('res-inversion');
             if(costo<=0||isNaN(meses)) { alert("Completa los datos de la compra"); return; }
@@ -1050,8 +1170,8 @@
         };
 
         window.analizarPrestamo = function() {
-            const cap = window.getMontoRealDesde('sim-pre-capital');
-            const int = window.getMontoRealDesde('sim-pre-interes');
+            const cap = getMontoRealDesde('sim-pre-capital');
+            const int = getMontoRealDesde('sim-pre-interes');
             const res = document.getElementById('res-prestamo');
             if(cap<=0||isNaN(int)) { alert("Completa los datos del préstamo"); return; }
             const porcentajeLiquidez = (cap / Math.max(window.state.soles, 1)) * 100;
@@ -1110,148 +1230,40 @@
 
             html2pdf().set(opt).from(element).save().then(() => {
                 element.style.display = 'none';
-                btn.innerHTML = `<i class=\"ph-fill ph-download-simple text-xl\"></i> Descargar PDF`;
+                btn.innerHTML = `<i class="ph-fill ph-download-simple text-xl"></i> Descargar PDF`;
                 btn.classList.remove('opacity-75', 'cursor-wait');
                 window.mostrarToast("PDF Descargado Exitosamente", "bg-emerald-500", "ph-file-pdf");
             }).catch(err => {
                 element.style.display = 'none';
-                btn.innerHTML = `<i class=\"ph-fill ph-download-simple text-xl\"></i> Descargar PDF`;
+                btn.innerHTML = `<i class="ph-fill ph-download-simple text-xl"></i> Descargar PDF`;
                 btn.classList.remove('opacity-75', 'cursor-wait');
                 alert("Hubo un error al generar el PDF.");
             });
         };
 
-        // ==========================================
-        // 8. FUNCIONES FIREBASE DE ESCRITURA
-        // ==========================================
-        window.guardarRegistro = async function() {
-            const monto = window.getMontoRealDesde('monto-input-visual');
-            let catFinal = window.categoriaSeleccionada;
-            const nota = document.getElementById('nota-input').value.trim();
-            if(window.categoriaSeleccionada === 'Imprevisto') catFinal = document.getElementById('select-imprevisto').value;
-
-            if(monto <= 0 || !window.categoriaSeleccionada) { alert("Ingresa un monto válido y selecciona una categoría."); return; }
-            if(!currentUser) { alert("La Nube no está conectada."); return; }
-
-            if(window.tipoActual === 'ingreso') {
-                if(window.monedaRegistro === 'PEN') { window.state.soles += monto; window.state.ingresosSoles += monto; }
-                else { window.state.dolares += monto; window.state.ingresosDolares += monto; }
-            } else {
-                if(window.monedaRegistro === 'PEN') { window.state.soles -= monto; window.state.egresosSoles += monto; }
-                else { window.state.dolares -= monto; window.state.egresosDolares += monto; }
-            }
-            
-            const stateRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'data', 'estado');
-            await setDoc(stateRef, window.state);
-
-            const nomHistorial = nota ? `${catFinal} (${nota})` : catFinal;
-            const histRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'historial');
-            await addDoc(histRef, { fecha: window.getFechaActualStr(), nom: nomHistorial, monto, tipo: window.tipoActual, cat: window.categoriaSeleccionada, moneda: window.monedaRegistro, timestamp: Date.now() });
-
-            window.mostrarToast(window.tipoActual === 'ingreso' ? 'Ingreso Guardado' : 'Egreso Guardado', window.tipoActual === 'ingreso' ? 'bg-income' : 'bg-expense', window.tipoActual === 'ingreso' ? 'ph-check' : 'ph-minus');
-            
-            document.getElementById('monto-input-visual').value = ''; document.getElementById('monto-input-visual').setAttribute('data-raw', '0'); document.getElementById('nota-input').value = ''; document.getElementById('selector-imprevisto').classList.add('hidden'); document.querySelectorAll('.cat-btn').forEach(el => el.classList.remove('selected-income', 'selected-expense', 'selected-warning')); window.categoriaSeleccionada = null;
-        };
-
-        window.guardarPrestamo = async function() {
-            const nom = document.getElementById('nuevo-prestamo-nombre').value.trim();
-            const cap = window.getMontoRealDesde('nuevo-prestamo-capital');
-            const porc = window.getMontoRealDesde('nuevo-prestamo-porcentaje');
-            const cuotasStr = document.getElementById('nuevo-prestamo-cuotas').value;
-            const isTemp = document.getElementById('check-temporal').checked;
-
-            if(!nom || cap <= 0 || (!isTemp && (!cuotasStr))) { alert("Completa todos los campos obligatorios."); return; }
-            if(!currentUser) return;
-
-            const cuotas = isTemp ? 1 : parseInt(cuotasStr);
-            const frec = isTemp ? 'Único' : document.getElementById('nuevo-prestamo-frecuencia').value;
-
-            const ganancia = cap * (porc/100);
-            const total = cap + ganancia;
-            const cuotaArr = Array.from({length:cuotas}, (_,i) => ({id:i+1, monto:total/cuotas, pagada:false}));
-            
-            const pId = Date.now().toString();
-            const nuevoP = { id: pId, moneda: window.monedaPrestamo, nombre:nom, capital:cap, ganancia, total, numCuotas:cuotas, frecuencia:frec, cuotas:cuotaArr, esTemporal: isTemp, timestamp: Date.now() };
-            
-            const pRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'prestamos', pId);
-            await setDoc(pRef, nuevoP);
-            
-            if(window.monedaPrestamo === 'PEN') { window.state.soles -= cap; window.state.egresosSoles += cap; }
-            else { window.state.dolares -= cap; window.state.egresosDolares += cap; }
-            const stateRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'data', 'estado');
-            await setDoc(stateRef, window.state);
-
-            const histRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'historial');
-            await addDoc(histRef, { fecha: window.getFechaActualStr(), nom: `Préstamo a ${nom}`, monto: cap, tipo: 'egreso', cat: 'Préstamo', moneda: window.monedaPrestamo, timestamp: Date.now() });
-            
-            window.cerrarModalPrestamo();
-            window.mostrarToast("Préstamo Generado", "bg-info", "ph-user-plus");
-        };
-
-        window.confirmarPagoCuota = async function() {
-            if(document.getElementById('input-token-pago').value !== window.tokenGeneradoActual) return;
-            window.cerrarModalToken();
-            if(!currentUser) return;
-
-            const p = window.dbPrestamos.find(x=>x.id===window.cuotaPendientePago.idP);
-            const c = p.cuotas.find(x=>x.id===window.cuotaPendientePago.idC);
-            c.pagada = true;
-            
-            const pRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'prestamos', p.id);
-            await setDoc(pRef, p);
-
-            const capPorCuota = p.capital / p.numCuotas;
-            const intPorCuota = p.ganancia / p.numCuotas;
-
-            if(p.moneda === 'PEN') {
-                window.state.soles += c.monto; window.state.egresosSoles = Math.max(0, window.state.egresosSoles - capPorCuota); window.state.ingresosSoles += intPorCuota; 
-            } else {
-                window.state.dolares += c.monto; window.state.egresosDolares = Math.max(0, window.state.egresosDolares - capPorCuota); window.state.ingresosDolares += intPorCuota;
-            }
-            const stateRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'data', 'estado');
-            await setDoc(stateRef, window.state);
-
-            const histRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'historial');
-            await addDoc(histRef, { fecha: window.getFechaActualStr(), nom: `Cobro a ${p.nombre}`, monto: c.monto, tipo: 'ingreso', cat: 'Cobro', moneda: p.moneda, timestamp: Date.now() });
-
-            window.mostrarToast("Pago Verificado en Nube", "bg-income", "ph-check");
-            window.renderDetallePrestamoUI();
-        };
-
-        window.confirmarEliminarPrestamo = async function() {
-            const input = document.getElementById('input-pin-eliminar');
-            if(input.value !== '722056') { alert("PIN Incorrecto"); input.value=''; return; }
-            window.cerrarModalPin();
-            if(!currentUser) return;
-            
-            const pRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'prestamos', window.prestamoPendienteEliminar);
-            await deleteDoc(pRef);
-            
-            window.cerrarDetallePrestamo();
-            window.mostrarToast("Préstamo Eliminado", "bg-slate-800", "ph-trash");
-        };
-
-        // ==========================================
-        // 9. INICIO Y SINCRONIZACIÓN DE FIREBASE
-        // ==========================================
+        // --- FIREBASE LISTENERS ---
         function setupListeners() {
             if(!currentUser) return;
+
+            if(window.unsubscribeState) window.unsubscribeState();
             const stateRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'data', 'estado');
-            onSnapshot(stateRef, (docSnap) => {
+            window.unsubscribeState = onSnapshot(stateRef, (docSnap) => {
                 if(docSnap.exists()) window.state = docSnap.data();
                 else setDoc(stateRef, window.state);
                 window.actualizarUI();
             });
 
+            if(window.unsubscribeHist) window.unsubscribeHist();
             const histRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'historial');
-            onSnapshot(histRef, (snap) => {
+            window.unsubscribeHist = onSnapshot(histRef, (snap) => {
                 const docs = []; snap.forEach(d => docs.push({ id: d.id, ...d.data() }));
                 window.historialMovimientos = docs.sort((a,b) => b.timestamp - a.timestamp);
                 window.renderHistorialUI();
             });
 
+            if(window.unsubscribePrest) window.unsubscribePrest();
             const prestRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'prestamos');
-            onSnapshot(prestRef, (snap) => {
+            window.unsubscribePrest = onSnapshot(prestRef, (snap) => {
                 const docs = []; snap.forEach(d => docs.push({ id: d.id, ...d.data() }));
                 window.dbPrestamos = docs.sort((a,b) => b.timestamp - a.timestamp);
                 window.renderListaPrestamos();
@@ -1263,20 +1275,32 @@
             });
         }
 
-        function iniciarFirebaseYDatos() {
+        async function saveStateToDB() {
+            if(!currentUser) return;
+            const stateRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'data', 'estado');
+            await setDoc(stateRef, window.state);
+        }
+
+        const initApp = async () => {
+            window.saldosOcultos = false; 
+            window.toggleSaldo(); 
             window.actualizarUI();
-            
-            signInAnonymously(auth).catch((error) => {
+
+            try {
+                // Iniciar Firebase de Forma Anónima Silenciosa
+                await signInAnonymously(auth);
+            } catch (error) {
                 console.error("Auth Error:", error);
                 const overlay = document.getElementById('loading-overlay');
                 overlay.innerHTML = "<div class='text-center px-6'><i class='ph-fill ph-warning-circle text-5xl text-red-500 mb-2'></i><h2 class='text-red-500 font-bold text-xl'>Error de Conexión</h2><p class='text-slate-500 mt-2 text-sm'>Debes activar 'Anónimo' en Firebase Authentication -> Sign-in methods.</p></div>";
                 overlay.classList.remove('hidden');
-            });
-        }
+            }
+        };
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
+                // Solo cargar datos si el candado ya se quitó (por si la BD responde rápido)
                 if (document.getElementById('view-lockscreen').classList.contains('hidden')) {
                     setupListeners(); 
                 }
@@ -1288,31 +1312,16 @@
             }
         });
 
-        // ==========================================
-        // 10. ARRANQUE DE APLICACIÓN
-        // ==========================================
-        const arrancarApp = () => {
+        // ARRANQUE SEGURO
+        document.addEventListener("DOMContentLoaded", () => {
             document.getElementById('view-lockscreen').classList.remove('hidden');
-            if(window.updateNavIconColor) window.updateNavIconColor('#10B981');
             
-            // Setear el selector de meses del PDF al cargar la UI
-            const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-            const mesStr = `${meses[new Date().getMonth()]} ${new Date().getFullYear()}`;
-            document.getElementById('mes-actual').innerText = `Resumen ${mesStr}`;
-            document.getElementById('select-mes-pdf').innerHTML = `<option value="current">${mesStr}</option>`;
-
-            const isBioEnabled = localStorage.getItem('app_bio') === 'true';
-            if(isBioEnabled) {
+            if(HAS_BIO) {
                 document.getElementById('btn-faceid').classList.remove('invisible');
-                if(typeof window.iniciarBiometria === 'function') window.iniciarBiometria(); 
+                window.iniciarBiometria(); 
             }
-        };
-
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', arrancarApp);
-        } else {
-            arrancarApp();
-        }
+            initApp();
+        });
 
     </script>
 </body>
