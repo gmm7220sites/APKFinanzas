@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <title>Control Financiero Móvil</title>
+    <!-- Favicon / Logo de la App -->
+    <link rel="icon" type="image/png" href="billete.png">
+    
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -80,7 +83,7 @@
         <p class="text-sm text-slate-500" id="loading-status">Sincronizando tus finanzas</p>
     </div>
 
-    <!-- ================= PANTALLA DE AUTENTICACIÓN (NUEVA) ================= -->
+    <!-- ================= PANTALLA DE AUTENTICACIÓN ================= -->
     <div id="view-auth" class="fixed inset-0 bg-slate-900 z-[400] hidden flex-col items-center justify-center p-6 transition-opacity duration-500">
         <div class="bg-white w-full max-w-sm rounded-3xl p-8 shadow-2xl flex flex-col items-center">
             <div class="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center text-3xl mb-4"><i class="ph-fill ph-cloud-check"></i></div>
@@ -351,7 +354,7 @@
                 <div class="flex justify-between items-center mb-2">
                     <div class="flex items-center gap-2">
                         <h1 class="text-xl font-extrabold text-slate-800 tracking-tight" id="mes-actual">Resumen</h1>
-                        <!-- NUEVO: Indicador visual de Tiempo Real / Sincronización -->
+                        <!-- Indicador visual de Tiempo Real / Sincronización -->
                         <span id="indicador-nube" class="flex items-center gap-1 text-[10px] bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full font-bold">
                             <div class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div> Sincronizado
                         </span>
@@ -800,7 +803,10 @@
                 await signInWithEmailAndPassword(auth, e, p);
                 window.mostrarToast("Sesión iniciada", "bg-income", "ph-check");
             } catch(error) {
-                err.innerText = "Error: Verifica tu correo o contraseña"; err.classList.remove('hidden');
+                // AHORA MUESTRA EL ERROR REAL PARA PODER DEBUGGEAR
+                console.error(error);
+                err.innerText = "Error: " + error.message; 
+                err.classList.remove('hidden');
             }
         };
 
@@ -814,7 +820,10 @@
                 await createUserWithEmailAndPassword(auth, e, p);
                 window.mostrarToast("Cuenta creada", "bg-income", "ph-check");
             } catch(error) {
-                err.innerText = "Error: Contraseña corta (min. 6) o el correo ya existe."; err.classList.remove('hidden');
+                // AHORA MUESTRA EL ERROR REAL
+                console.error(error);
+                err.innerText = "Error: " + error.message; 
+                err.classList.remove('hidden');
             }
         };
 
@@ -1317,7 +1326,17 @@
             });
         };
 
-        // --- FIREBASE LISTENERS (Con callbacks de error implementados) ---
+        // --- MANEJO AVANZADO DE ERRORES FIREBASE ---
+        function mostrarErrorNube(error) {
+            console.error("Error BD:", error);
+            if(error.code === 'permission-denied') {
+                window.mostrarToast("Firebase Bloqueado: Revisa las Reglas en la Consola", "bg-red-600", "ph-warning-octagon");
+            } else {
+                window.mostrarToast("Problema de conexión con la Nube", "bg-red-500", "ph-wifi-slash");
+            }
+        }
+
+        // --- FIREBASE LISTENERS ---
         function setupListeners() {
             if(!currentUser) return;
 
@@ -1327,7 +1346,7 @@
                 if(docSnap.exists()) window.state = docSnap.data();
                 else setDoc(stateRef, window.state);
                 window.actualizarUI();
-            }, (error) => console.error("Error al obtener estado:", error));
+            }, mostrarErrorNube); // <-- AHORA REPORTA EL ERROR EN PANTALLA
 
             if(window.unsubscribeHist) window.unsubscribeHist();
             const histRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'historial');
@@ -1335,7 +1354,7 @@
                 const docs = []; snap.forEach(d => docs.push({ id: d.id, ...d.data() }));
                 window.historialMovimientos = docs.sort((a,b) => b.timestamp - a.timestamp);
                 window.renderHistorialUI();
-            }, (error) => console.error("Error al obtener historial:", error));
+            }, mostrarErrorNube); // <-- AHORA REPORTA EL ERROR EN PANTALLA
 
             if(window.unsubscribePrest) window.unsubscribePrest();
             const prestRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'prestamos');
@@ -1348,13 +1367,17 @@
                     if(window.prestamoActualVisualizando) window.renderDetallePrestamoUI();
                     else window.cerrarDetallePrestamo();
                 }
-            }, (error) => console.error("Error al obtener prestamos:", error));
+            }, mostrarErrorNube); // <-- AHORA REPORTA EL ERROR EN PANTALLA
         }
 
         async function saveStateToDB() {
             if(!currentUser) return;
             const stateRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'data', 'estado');
-            await setDoc(stateRef, window.state);
+            try {
+                await setDoc(stateRef, window.state);
+            } catch(e) {
+                mostrarErrorNube(e);
+            }
         }
 
         const initApp = async () => {
