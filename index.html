@@ -80,6 +80,23 @@
         <p class="text-sm text-slate-500" id="loading-status">Sincronizando tus finanzas</p>
     </div>
 
+    <!-- ================= PANTALLA DE AUTENTICACIÓN (NUEVA) ================= -->
+    <div id="view-auth" class="fixed inset-0 bg-slate-900 z-[400] hidden flex-col items-center justify-center p-6 transition-opacity duration-500">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-8 shadow-2xl flex flex-col items-center">
+            <div class="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center text-3xl mb-4"><i class="ph-fill ph-cloud-check"></i></div>
+            <h2 class="text-xl font-black text-slate-800 mb-1">Cuenta en la Nube</h2>
+            <p class="text-sm text-slate-500 text-center mb-6">Inicia sesión para sincronizar tus datos en todos tus dispositivos.</p>
+
+            <input type="email" id="auth-email" placeholder="Correo electrónico" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 mb-3 focus:outline-none focus:border-blue-500 font-medium">
+            <input type="password" id="auth-pass" placeholder="Contraseña" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 mb-6 focus:outline-none focus:border-blue-500 font-medium">
+
+            <button onclick="window.iniciarSesionCloud()" class="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl active:scale-95 transition-transform mb-3 shadow-md">Iniciar Sesión</button>
+            <button onclick="window.crearCuentaCloud()" class="w-full bg-slate-100 text-slate-600 font-bold py-3.5 rounded-xl active:scale-95 transition-transform">Crear Cuenta Nueva</button>
+
+            <p id="auth-error" class="text-red-500 text-xs text-center mt-4 font-bold hidden"></p>
+        </div>
+    </div>
+
     <!-- ================= PANTALLA DE BLOQUEO MAESTRA (PIN 7220 / FaceID) ================= -->
     <div id="view-lockscreen" class="fixed inset-0 bg-slate-900 z-[300] flex flex-col items-center justify-between py-16 transition-opacity duration-500">
         <div class="flex flex-col items-center mt-10">
@@ -481,7 +498,7 @@
     <!-- FIREBASE & JS INTEGRATION -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInWithCustomToken, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, collection, onSnapshot, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const userFirebaseConfig = {
@@ -747,9 +764,38 @@
                 window.mostrarToast("Biometría Desactivada", "bg-slate-800", "ph-face-id");
             }
         };
+        
         window.cerrarSesionApp = async function() {
-            if(confirm("¿Estás seguro que deseas cerrar sesión? Borrarás el acceso a la nube.")) {
+            if(confirm("¿Estás seguro que deseas cerrar sesión en este dispositivo?")) {
                 try { await signOut(auth); window.location.reload(); } catch(e) { console.error(e); }
+            }
+        };
+
+        window.iniciarSesionCloud = async function() {
+            const e = document.getElementById('auth-email').value;
+            const p = document.getElementById('auth-pass').value;
+            const err = document.getElementById('auth-error');
+            if(!e || !p) { err.innerText = "Completa todos los campos"; err.classList.remove('hidden'); return; }
+            err.classList.add('hidden');
+            try {
+                await signInWithEmailAndPassword(auth, e, p);
+                window.mostrarToast("Sesión iniciada", "bg-income", "ph-check");
+            } catch(error) {
+                err.innerText = "Error: Verifica tu correo o contraseña"; err.classList.remove('hidden');
+            }
+        };
+
+        window.crearCuentaCloud = async function() {
+            const e = document.getElementById('auth-email').value;
+            const p = document.getElementById('auth-pass').value;
+            const err = document.getElementById('auth-error');
+            if(!e || !p) { err.innerText = "Completa todos los campos"; err.classList.remove('hidden'); return; }
+            err.classList.add('hidden');
+            try {
+                await createUserWithEmailAndPassword(auth, e, p);
+                window.mostrarToast("Cuenta creada", "bg-income", "ph-check");
+            } catch(error) {
+                err.innerText = "Error: Contraseña corta (min. 6) o el correo ya existe."; err.classList.remove('hidden');
             }
         };
 
@@ -1299,38 +1345,45 @@
             populateMonths();
 
             try {
-                // Validación para uso de custom tokens en nube / local según requerimientos
+                // Validación para uso de custom tokens en la vista previa
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
+                } 
+                // ELIMINADO: signInAnonymously. Ahora dependemos del inicio de sesión con correo.
             } catch (error) {
                 console.error("Auth Error:", error);
-                const overlay = document.getElementById('loading-overlay');
-                overlay.innerHTML = "<div class='text-center px-6'><i class='ph-fill ph-warning-circle text-5xl text-red-500 mb-2'></i><h2 class='text-red-500 font-bold text-xl'>Error de Conexión</h2><p class='text-slate-500 mt-2 text-sm'>Revisa tu configuración de autenticación de Firebase.</p></div>";
-                overlay.classList.remove('hidden');
             }
         };
 
         onAuthStateChanged(auth, (user) => {
+            const overlay = document.getElementById('loading-overlay');
+            if(overlay) {
+                overlay.classList.add('opacity-0');
+                setTimeout(() => overlay.classList.add('hidden'), 500);
+            }
+
             if (user) {
                 currentUser = user;
-                if (document.getElementById('view-lockscreen').classList.contains('hidden')) {
-                    setupListeners(); 
-                }
-                const overlay = document.getElementById('loading-overlay');
-                if(overlay) {
-                    overlay.classList.add('opacity-0');
-                    setTimeout(() => overlay.classList.add('hidden'), 500);
-                }
+                // Ocultar Auth, mostrar Bloqueo PIN
+                document.getElementById('view-auth').classList.add('hidden');
+                document.getElementById('view-auth').classList.remove('flex');
+                document.getElementById('view-lockscreen').classList.remove('hidden');
+                document.getElementById('view-lockscreen').classList.add('flex');
+                
+                // Los listeners se inicializarán solo cuando ingresen el PIN correctamente
+            } else {
+                currentUser = null;
+                // Ocultar PIN, mostrar Auth
+                document.getElementById('view-lockscreen').classList.add('hidden');
+                document.getElementById('view-lockscreen').classList.remove('flex');
+                document.getElementById('view-auth').classList.remove('hidden');
+                document.getElementById('view-auth').classList.add('flex');
             }
         });
 
         // ARRANQUE SEGURO
         document.addEventListener("DOMContentLoaded", () => {
-            document.getElementById('view-lockscreen').classList.remove('hidden');
-            
+            // El inicio decide si mostrar el PIN o la pantalla de Login
             if(HAS_BIO) {
                 document.getElementById('btn-faceid').classList.remove('invisible');
                 window.iniciarBiometria(); 
