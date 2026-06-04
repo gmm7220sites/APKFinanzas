@@ -28,10 +28,6 @@
                         warningLight: '#FEF3C7',
                         info: '#3B82F6',
                         infoLight: '#DBEAFE',
-                    },
-                    boxShadow: {
-                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
-                        'float': '0 10px 25px -5px rgba(0, 0, 0, 0.05)'
                     }
                 }
             }
@@ -71,8 +67,6 @@
 
         @keyframes slideUp { from { transform: translate(-50%, 100%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
         .toast-animate { animation: slideUp 0.3s ease-out forwards; }
-        
-        /* Animación para error de PIN */
         @keyframes shake { 0%, 100% {transform: translateX(0);} 25% {transform: translateX(-10px);} 75% {transform: translateX(10px);} }
         .animate-shake { animation: shake 0.3s ease-in-out; }
 
@@ -82,17 +76,17 @@
 <body class="font-sans antialiased h-[100dvh] flex flex-col relative selection:bg-incomeLight selection:text-income">
 
     <!-- Pantalla de Carga de Firebase -->
-    <div id="loading-overlay" class="fixed inset-0 bg-white z-[200] flex flex-col items-center justify-center transition-opacity duration-500">
+    <div id="loading-overlay" class="fixed inset-0 bg-white z-[200] hidden flex-col items-center justify-center transition-opacity duration-500">
         <i class="ph-fill ph-cloud-arrow-up text-6xl text-income animate-bounce mb-4"></i>
         <h2 class="text-xl font-bold text-slate-800">Conectando a la Nube...</h2>
-        <p class="text-sm text-slate-500">Sincronizando tus finanzas</p>
+        <p class="text-sm text-slate-500" id="loading-status">Sincronizando tus finanzas</p>
     </div>
 
-    <!-- ================= PANTALLA DE BLOQUEO (PIN / FaceID) ================= -->
-    <div id="view-lockscreen" class="fixed inset-0 bg-slate-900 z-[300] hidden flex flex-col items-center justify-between py-16">
+    <!-- ================= PANTALLA DE BLOQUEO MAESTRA (PIN 7220 / FaceID) ================= -->
+    <div id="view-lockscreen" class="fixed inset-0 bg-slate-900 z-[300] flex flex-col items-center justify-between py-16 transition-opacity duration-500">
         <div class="flex flex-col items-center mt-10">
             <i class="ph-fill ph-lock-key text-5xl text-blue-500 mb-6" id="lock-icon"></i>
-            <h2 class="text-white text-xl font-bold mb-8 tracking-wide" id="lock-title">Ingresa tu PIN</h2>
+            <h2 class="text-white text-xl font-bold mb-8 tracking-wide" id="lock-title">Ingresa tu PIN Maestro</h2>
             
             <div class="flex gap-6 mb-12" id="pin-indicators">
                 <div class="w-4 h-4 rounded-full bg-slate-700 transition-colors duration-200"></div>
@@ -112,38 +106,24 @@
             <button onclick="window.pressPin('7')" class="w-16 h-16 mx-auto rounded-full bg-slate-800 text-white text-2xl font-bold active:bg-slate-700 transition-colors">7</button>
             <button onclick="window.pressPin('8')" class="w-16 h-16 mx-auto rounded-full bg-slate-800 text-white text-2xl font-bold active:bg-slate-700 transition-colors">8</button>
             <button onclick="window.pressPin('9')" class="w-16 h-16 mx-auto rounded-full bg-slate-800 text-white text-2xl font-bold active:bg-slate-700 transition-colors">9</button>
-            
             <button onclick="window.iniciarBiometria()" id="btn-faceid" class="w-16 h-16 mx-auto rounded-full text-blue-400 text-4xl flex items-center justify-center active:scale-95 transition-transform invisible"><i class="ph-fill ph-face-id"></i></button>
-            
             <button onclick="window.pressPin('0')" class="w-16 h-16 mx-auto rounded-full bg-slate-800 text-white text-2xl font-bold active:bg-slate-700 transition-colors">0</button>
-            
             <button onclick="window.deletePin()" class="w-16 h-16 mx-auto rounded-full text-slate-400 text-3xl flex items-center justify-center active:scale-95 transition-transform"><i class="ph-fill ph-backspace"></i></button>
         </div>
     </div>
 
-    <!-- Menú de Configuración y Seguridad (Settings Modal) -->
+    <!-- Menú de Configuración y Seguridad -->
     <div id="modal-settings" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] hidden flex flex-col justify-end">
         <div class="bg-white w-full rounded-t-3xl p-6 shadow-2xl transform transition-transform duration-300 translate-y-full" id="modal-settings-content">
             <div class="flex justify-between items-center mb-6">
                 <div class="flex items-center gap-2">
-                    <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600"><i class="ph-fill ph-gear text-lg"></i></div>
-                    <h2 class="text-xl font-bold text-slate-800">Configuración de Seguridad</h2>
+                    <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600"><i class="ph-fill ph-shield-check text-lg"></i></div>
+                    <h2 class="text-xl font-bold text-slate-800">Seguridad</h2>
                 </div>
                 <button onclick="window.cerrarSettings()" class="bg-slate-100 p-2 rounded-full text-slate-500 hover:bg-slate-200"><i class="ph ph-x text-lg font-bold"></i></button>
             </div>
 
             <div class="space-y-3 mb-6">
-                <div class="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                    <div>
-                        <h3 class="font-bold text-slate-800 text-[16px]">Bloqueo por PIN</h3>
-                        <p class="text-xs text-slate-500">Requerir 4 dígitos al abrir</p>
-                    </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="toggle-pin" onchange="window.manejarTogglePin(this)" class="sr-only peer">
-                        <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-income"></div>
-                    </label>
-                </div>
-
                 <div class="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100" id="opcion-biometria">
                     <div>
                         <h3 class="font-bold text-slate-800 text-[16px]">FaceID / Huella</h3>
@@ -162,7 +142,6 @@
         </div>
     </div>
 
-
     <!-- Plantilla Oculta para el PDF -->
     <div id="pdf-template" class="p-8 bg-white text-slate-800 font-sans" style="width: 800px; display: none;">
         <div class="border-b-2 border-slate-200 pb-4 mb-6 flex justify-between items-end">
@@ -175,7 +154,6 @@
                 <p class="text-slate-800 font-bold" id="pdf-fecha-gen">Fecha</p>
             </div>
         </div>
-
         <div class="grid grid-cols-2 gap-6 mb-8">
             <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100">
                 <p class="text-xs font-bold text-slate-400 uppercase mb-2">Resumen Soles (PEN)</p>
@@ -190,7 +168,6 @@
                 <div class="border-t border-slate-200 pt-2 flex justify-between"><span class="font-bold text-slate-800">Fondo Total:</span><span class="font-black text-slate-900 text-lg" id="pdf-liq-dol">$ 0.00</span></div>
             </div>
         </div>
-
         <h3 class="text-lg font-bold text-slate-800 mb-4 border-b border-slate-200 pb-2">Detalle de Movimientos</h3>
         <table class="w-full text-left border-collapse">
             <thead>
@@ -203,7 +180,7 @@
             </thead>
             <tbody id="pdf-tabla-body" class="text-sm"></tbody>
         </table>
-        <p class="text-center text-xs text-slate-400 mt-8 pt-4 border-t border-slate-200">Documento respaldado por Firebase.</p>
+        <p class="text-center text-xs text-slate-400 mt-8 pt-4 border-t border-slate-200">Documento respaldado por Firebase Nube.</p>
     </div>
 
     <!-- Toast Notification -->
@@ -261,8 +238,8 @@
                 </div>
                 <input type="text" id="nuevo-prestamo-nombre" placeholder="Nombre del deudor (Obligatorio)" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium focus:outline-none focus:border-blue-500">
                 <div class="grid grid-cols-2 gap-3">
-                    <input type="tel" inputmode="decimal" id="nuevo-prestamo-capital" placeholder="Capital" oninput="window.validarNumero(this); window.calcularPrestamoAuto()" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold focus:outline-none focus:border-blue-500">
-                    <input type="tel" inputmode="decimal" id="nuevo-prestamo-porcentaje" placeholder="Interés (%)" oninput="window.validarNumero(this); window.calcularPrestamoAuto()" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold focus:outline-none focus:border-blue-500">
+                    <input type="tel" inputmode="decimal" id="nuevo-prestamo-capital" placeholder="Capital" oninput="window.validarNumeroFormato(this); window.calcularPrestamoAuto()" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold focus:outline-none focus:border-blue-500">
+                    <input type="tel" inputmode="decimal" id="nuevo-prestamo-porcentaje" placeholder="Interés (%)" oninput="window.validarNumeroFormato(this); window.calcularPrestamoAuto()" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold focus:outline-none focus:border-blue-500">
                 </div>
                 <div class="bg-slate-100 rounded-xl p-3 text-center">
                     <div class="flex justify-between mb-1 text-slate-500 text-[16px]"><span>Ganancia:</span><span id="calc-ganancia" class="font-bold">+ 0.00</span></div>
@@ -442,7 +419,7 @@
                     <div class="w-12 h-12 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center mb-3 text-2xl"><i class="ph-fill ph-rocket-launch"></i></div>
                     <h3 class="font-bold text-lg text-slate-800 mb-3 leading-tight">Evaluar Inversión/Compra</h3>
                     <div class="flex gap-2 mb-3">
-                        <input type="tel" inputmode="decimal" id="sim-inv-costo" placeholder="Costo S/" oninput="window.validarNumero(this)" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold focus:outline-none focus:border-blue-500">
+                        <input type="tel" inputmode="decimal" id="sim-inv-costo" placeholder="Costo S/" oninput="window.validarNumeroFormato(this)" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold focus:outline-none focus:border-blue-500">
                         <input type="tel" inputmode="numeric" id="sim-inv-meses" placeholder="Meses" oninput="window.validarEntero(this)" class="w-1/3 bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold text-center focus:outline-none focus:border-blue-500">
                     </div>
                     <button onclick="window.analizarInversion()" class="w-full bg-slate-800 text-white font-bold py-3.5 rounded-xl active:scale-95 transition-transform text-[16px]">Analizar Compra</button>
@@ -453,8 +430,8 @@
                     <div class="w-12 h-12 bg-indigo-50 text-indigo-500 rounded-xl flex items-center justify-center mb-3 text-2xl"><i class="ph-fill ph-scales"></i></div>
                     <h3 class="font-bold text-lg text-slate-800 mb-3 leading-tight">Evaluar Riesgo de Préstamo</h3>
                     <div class="flex gap-2 mb-3">
-                        <input type="tel" inputmode="decimal" id="sim-pre-capital" placeholder="Capital S/" oninput="window.validarNumero(this)" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold focus:outline-none focus:border-indigo-500">
-                        <input type="tel" inputmode="decimal" id="sim-pre-interes" placeholder="Interés %" oninput="window.validarNumero(this)" class="w-1/3 bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold text-center focus:outline-none focus:border-indigo-500">
+                        <input type="tel" inputmode="decimal" id="sim-pre-capital" placeholder="Capital S/" oninput="window.validarNumeroFormato(this)" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold focus:outline-none focus:border-indigo-500">
+                        <input type="tel" inputmode="decimal" id="sim-pre-interes" placeholder="Interés %" oninput="window.validarNumeroFormato(this)" class="w-1/3 bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold text-center focus:outline-none focus:border-indigo-500">
                     </div>
                     <button onclick="window.analizarPrestamo()" class="w-full bg-indigo-600 text-white font-bold py-3.5 rounded-xl active:scale-95 transition-transform text-[16px]">Medir Riesgo</button>
                     <div id="res-prestamo" class="hidden mt-4 p-4 rounded-xl border"></div>
@@ -507,7 +484,7 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, collection, onSnapshot, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // === 1. CONFIGURACIÓN FIREBASE PROPORCIONADA ===
+        // === 1. CONFIGURACIÓN FIREBASE EXACTA ===
         const userFirebaseConfig = {
             apiKey: "AIzaSyB2NjGDJSX1g-dPph8-_nKFtlfLliEqsCY",
             authDomain: "control-finanzas-f7e53.firebaseapp.com",
@@ -522,7 +499,7 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appIdStr = typeof __app_id !== 'undefined' ? __app_id : 'control-finanzas';
+        const appIdStr = 'control-finanzas-db'; 
         let currentUser = null;
 
         // === 2. ESTADOS GLOBALES ===
@@ -541,15 +518,14 @@
         window.prestamoPendienteEliminar = null;
         window.tokenGeneradoActual = "";
 
-        // SEGURIDAD LOCAL
-        let currentPinMode = 'unlock'; 
-        let pendingSetPin = "";
+        // SEGURIDAD LOCAL (PIN MAESTRO FIJO: 7220)
         let enteredPin = "";
-        const HAS_PIN = localStorage.getItem('app_pin') !== null;
+        const CORRECT_PIN = '7220';
         const HAS_BIO = localStorage.getItem('app_bio') === 'true';
 
-        // === 3. FUNCIONES EXPUESTAS PARA EL HTML (HOISTING) ===
-        window.formatMoney = (val) => Number(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        // === 3. FUNCIONES EXPUESTAS (HOISTING) ===
+        // Formato Europeo/Latam: 1.000.000,00
+        window.formatMoney = (val) => Number(val).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         window.getFechaActualStr = () => {
             const d = new Date();
             return `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
@@ -580,6 +556,7 @@
             setTimeout(() => { toast.classList.remove('opacity-100'); setTimeout(() => toast.classList.add('hidden'), 300); }, 2000);
         };
 
+        // UI Y DASHBOARD
         window.actualizarUI = function() {
             const els = {
                 'saldo-soles': window.formatMoney(window.state.soles), 
@@ -640,36 +617,44 @@
             }
         };
 
-        // NUMÉRICOS SEGUROS
+        // --- SISTEMA NUMÉRICO ROBUSTO (Maneja comas y puntos a la perfección) ---
+        window.validarNumeroFormato = function(input) {
+            let text = input.value;
+            // Detecta si presionaste punto para decimal, lo cambia a coma
+            if(text.includes('.') && !text.includes(',')) {
+                if(text.endsWith('.')) text = text.slice(0, -1) + ',';
+            }
+            let parts = text.split(',');
+            if(parts.length > 2) parts = [parts[0], parts.slice(1).join('')];
+            
+            let integerPart = parts[0].replace(/[^0-9]/g, ''); 
+            let decimalPart = parts.length > 1 ? parts[1].replace(/[^0-9]/g, '') : '';
+            
+            let raw = integerPart + (parts.length > 1 ? '.' + decimalPart : '');
+            input.setAttribute('data-raw', raw);
+
+            if(integerPart !== '') {
+                integerPart = parseInt(integerPart, 10).toLocaleString('es-ES');
+                input.value = integerPart + (parts.length > 1 ? ',' + decimalPart : '');
+            } else {
+                input.value = '';
+            }
+        };
+
         window.validarNumero = function(input) {
-            let val = input.value.replace(/,/g, '.'); // Convierte coma de teclado a punto (LATAM)
-            val = val.replace(/[^0-9.]/g, ''); 
-            const parts = val.split('.');
-            if(parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
-            input.value = val;
+            window.validarNumeroFormato(input);
         };
 
         window.validarEntero = function(input) {
             input.value = input.value.replace(/[^0-9]/g, '');
         };
 
-        let valorNumericoReal = ""; 
-        window.formatInputValue = function(input) {
-            let val = input.value.replace(/,/g, '.');
-            val = val.replace(/[^0-9.]/g, '');
-            const partes = val.split('.');
-            if (partes.length > 2) val = partes[0] + '.' + partes.slice(1).join('');
-            valorNumericoReal = val;
-            if(val !== '') {
-                const parts = val.split('.');
-                parts[0] = Number(parts[0]).toLocaleString('en-US'); 
-                input.value = parts.join('.');
-            } else input.value = '';
-        };
+        function getMontoRealDesde(id) { 
+            const raw = document.getElementById(id).getAttribute('data-raw');
+            return parseFloat(raw) || 0; 
+        }
 
-        function getMontoReal() { return parseFloat(valorNumericoReal) || 0; }
-
-        // BIOMETRÍA Y PIN
+        // --- SEGURIDAD: BIOMETRÍA Y PIN MAESTRO ---
         window.pressPin = function(num) {
             if(enteredPin.length < 4) { enteredPin += num; updatePinIndicators(); }
             if(enteredPin.length === 4) setTimeout(evaluatePin, 100);
@@ -687,37 +672,19 @@
         }
 
         function evaluatePin() {
-            if(currentPinMode === 'unlock') {
-                if(enteredPin === localStorage.getItem('app_pin')) {
-                    document.getElementById('view-lockscreen').classList.add('hidden'); initApp();
-                } else animarErrorPin();
-            } else if (currentPinMode === 'set') {
-                if(pendingSetPin === "") {
-                    pendingSetPin = enteredPin; enteredPin = ""; updatePinIndicators();
-                    document.getElementById('lock-title').innerText = "Confirma tu PIN";
-                } else {
-                    if(pendingSetPin === enteredPin) {
-                        localStorage.setItem('app_pin', enteredPin);
-                        document.getElementById('view-lockscreen').classList.add('hidden');
-                        document.getElementById('toggle-pin').checked = true;
-                        window.mostrarToast("PIN Activado", "bg-income", "ph-lock-key");
-                        if(!currentUser) initApp();
-                    } else {
-                        animarErrorPin(); pendingSetPin = ""; document.getElementById('lock-title').innerText = "Crea tu PIN de 4 dígitos";
-                    }
-                }
+            if(enteredPin === CORRECT_PIN) {
+                document.getElementById('view-lockscreen').classList.add('hidden');
+                // Al Desbloquear exitosamente, iniciamos la base de datos
+                if(currentUser) setupListeners(); else initApp();
+            } else {
+                const dots = document.getElementById('pin-indicators').children;
+                for(let i=0; i<4; i++) dots[i].classList.replace('bg-blue-500', 'bg-red-500');
+                document.getElementById('pin-indicators').classList.add('animate-shake');
+                setTimeout(() => { document.getElementById('pin-indicators').classList.remove('animate-shake'); enteredPin = ""; updatePinIndicators(); }, 400);
             }
         }
 
-        function animarErrorPin() {
-            const dots = document.getElementById('pin-indicators').children;
-            for(let i=0; i<4; i++) dots[i].classList.replace('bg-blue-500', 'bg-red-500');
-            document.getElementById('pin-indicators').classList.add('animate-shake');
-            setTimeout(() => { document.getElementById('pin-indicators').classList.remove('animate-shake'); enteredPin = ""; updatePinIndicators(); }, 400);
-        }
-
         window.iniciarBiometria = async function() {
-            if(currentPinMode === 'set') return;
             try {
                 const credIdBase64 = localStorage.getItem('bio_cred_id');
                 if(!credIdBase64) throw new Error("No hay credencial");
@@ -731,10 +698,12 @@
 
                 const getOptions = { publicKey: { challenge: challenge, allowCredentials: [{ id: buffer, type: 'public-key' }], userVerification: 'required', timeout: 60000 } };
                 const assertion = await navigator.credentials.get(getOptions);
-                if(assertion) { document.getElementById('view-lockscreen').classList.add('hidden'); initApp(); }
+                if(assertion) { 
+                    document.getElementById('view-lockscreen').classList.add('hidden'); 
+                    if(currentUser) setupListeners(); else initApp();
+                }
             } catch (e) {
-                console.error("Biometría falló/cancelada:", e);
-                // Si la biometria falla no mostramos error invasivo para que el usuario use el PIN normal
+                console.warn("Biometría omitida.");
             }
         };
 
@@ -742,7 +711,6 @@
             try {
                 const challenge = new Uint8Array(32); window.crypto.getRandomValues(challenge);
                 const userId = new Uint8Array(16); window.crypto.getRandomValues(userId);
-                
                 const createOptions = {
                     publicKey: {
                         challenge: challenge, rp: { name: "Control Financiero Experto" },
@@ -752,7 +720,6 @@
                         timeout: 60000
                     }
                 };
-
                 const credential = await navigator.credentials.create(createOptions);
                 const bytes = new Uint8Array(credential.rawId);
                 let str = '';
@@ -763,17 +730,17 @@
                 localStorage.setItem('app_bio', 'true');
                 window.mostrarToast("FaceID / Huella Activado", "bg-income", "ph-face-id");
             } catch (e) {
-                console.error(e);
+                console.warn(e);
                 document.getElementById('toggle-bio').checked = false;
                 if(e.name === 'NotAllowedError') {
-                    window.mostrarToast("Biometría bloqueada en este entorno.", "bg-warning", "ph-warning");
+                    window.mostrarToast("Biometría bloqueada en este navegador.", "bg-warning", "ph-warning");
                 } else {
                     window.mostrarToast("Error activando biometría.", "bg-expense", "ph-x");
                 }
             }
         };
 
-        // SETTINGS (Engranaje)
+        // SETTINGS (Solo cierra sesión y biometría)
         window.abrirSettings = function() {
             document.getElementById('modal-settings').classList.remove('hidden');
             setTimeout(() => document.getElementById('modal-settings-content').classList.remove('translate-y-full'), 10);
@@ -782,20 +749,8 @@
             document.getElementById('modal-settings-content').classList.add('translate-y-full');
             setTimeout(() => document.getElementById('modal-settings').classList.add('hidden'), 300);
         };
-        window.manejarTogglePin = function(checkbox) {
-            if(checkbox.checked) {
-                window.cerrarSettings(); currentPinMode = 'set'; pendingSetPin = ""; enteredPin = ""; updatePinIndicators();
-                document.getElementById('lock-title').innerText = "Crea tu PIN de 4 dígitos";
-                document.getElementById('btn-faceid').classList.add('invisible');
-                document.getElementById('view-lockscreen').classList.remove('hidden');
-            } else {
-                localStorage.removeItem('app_pin'); window.mostrarToast("PIN Desactivado", "bg-slate-800", "ph-lock-key");
-                localStorage.removeItem('app_bio'); document.getElementById('toggle-bio').checked = false;
-            }
-        };
         window.manejarToggleBio = function(checkbox) {
             if(checkbox.checked) {
-                if(!localStorage.getItem('app_pin')) { alert("Primero debes activar un PIN de seguridad."); checkbox.checked = false; return; }
                 window.registrarBiometria();
             } else {
                 localStorage.removeItem('app_bio'); localStorage.removeItem('bio_cred_id');
@@ -803,12 +758,8 @@
             }
         };
         window.cerrarSesionApp = async function() {
-            if(confirm("¿Estás seguro que deseas cerrar sesión? Borrarás el acceso local a la nube.")) {
-                try {
-                    await signOut(auth);
-                    localStorage.removeItem('app_pin'); localStorage.removeItem('app_bio'); localStorage.removeItem('bio_cred_id');
-                    window.location.reload();
-                } catch(e) { console.error(e); }
+            if(confirm("¿Estás seguro que deseas cerrar sesión? Borrarás el acceso a la nube.")) {
+                try { await signOut(auth); window.location.reload(); } catch(e) { console.error(e); }
             }
         };
 
@@ -871,9 +822,9 @@
 
         // ACCIONES PRINCIPALES
         window.guardarRegistro = async function() {
-            const monto = getMontoReal();
-            if(monto <= 0 || !window.categoriaSeleccionada) { alert("Ingresa un monto y categoría validos."); return; }
-            if(!currentUser) { alert("Aún conectando a la Nube."); return; }
+            const monto = getMontoRealDesde('monto-input-visual');
+            if(monto <= 0 || !window.categoriaSeleccionada) { alert("Ingresa un monto válido y selecciona una categoría."); return; }
+            if(!currentUser) { alert("Aún conectando a la Nube. Espere un segundo."); return; }
 
             let catFinal = window.categoriaSeleccionada;
             const nota = document.getElementById('nota-input').value.trim();
@@ -897,8 +848,8 @@
             window.mostrarToast(window.tipoActual === 'ingreso' ? 'Ingreso Guardado' : 'Egreso Guardado', window.tipoActual === 'ingreso' ? 'bg-income' : 'bg-expense', window.tipoActual === 'ingreso' ? 'ph-check' : 'ph-minus');
 
             document.getElementById('monto-input-visual').value = '';
+            document.getElementById('monto-input-visual').setAttribute('data-raw', '0');
             document.getElementById('nota-input').value = '';
-            valorNumericoReal = "";
             document.getElementById('selector-imprevisto').classList.add('hidden');
             document.querySelectorAll('.cat-btn').forEach(el => el.classList.remove('selected-income', 'selected-expense', 'selected-warning'));
             window.categoriaSeleccionada = null;
@@ -908,7 +859,7 @@
             const lista = document.getElementById('lista-historial');
             const btnVerMas = document.getElementById('btn-ver-mas-historial');
             if(window.historialMovimientos.length === 0) {
-                lista.innerHTML = '<p class="text-center font-medium text-slate-400 py-4 text-[16px]">No hay movimientos en la Nube.</p>';
+                lista.innerHTML = '<p class="text-center font-medium text-slate-400 py-4 text-[16px]">No hay movimientos registrados.</p>';
                 btnVerMas.classList.add('hidden'); return;
             }
             lista.innerHTML = '';
@@ -950,7 +901,10 @@
             document.getElementById('modal-content').classList.add('translate-y-full');
             setTimeout(() => {
                 document.getElementById('modal-prestamo').classList.add('hidden');
-                ['nombre','capital','porcentaje'].forEach(id => document.getElementById('nuevo-prestamo-'+id).value='');
+                ['nombre','capital','porcentaje'].forEach(id => {
+                    const el = document.getElementById('nuevo-prestamo-'+id);
+                    el.value=''; el.setAttribute('data-raw', '0');
+                });
                 document.getElementById('nuevo-prestamo-cuotas').value='1';
             }, 300);
         };
@@ -961,19 +915,19 @@
             const inCuotas = document.getElementById('nuevo-prestamo-cuotas');
 
             if(isTemp) {
-                inPorc.value = "0"; inPorc.disabled = true; inPorc.classList.add('opacity-40');
+                inPorc.value = "0"; inPorc.setAttribute('data-raw', '0'); inPorc.disabled = true; inPorc.classList.add('opacity-40');
                 inFrec.value = "Único"; inFrec.disabled = true; inFrec.classList.add('opacity-40');
                 inCuotas.value = "1"; inCuotas.disabled = true; inCuotas.classList.add('opacity-40');
             } else {
-                inPorc.value = ""; inPorc.disabled = false; inPorc.classList.remove('opacity-40');
+                inPorc.value = ""; inPorc.setAttribute('data-raw', '0'); inPorc.disabled = false; inPorc.classList.remove('opacity-40');
                 inFrec.value = "Semanal"; inFrec.disabled = false; inFrec.classList.remove('opacity-40');
                 inCuotas.value = "1"; inCuotas.disabled = false; inCuotas.classList.remove('opacity-40');
             }
             window.calcularPrestamoAuto();
         };
         window.calcularPrestamoAuto = function() {
-            const cap = parseFloat(document.getElementById('nuevo-prestamo-capital').value.replace(/,/g, '.'))||0;
-            const porc = parseFloat(document.getElementById('nuevo-prestamo-porcentaje').value.replace(/,/g, '.'))||0;
+            const cap = getMontoRealDesde('nuevo-prestamo-capital');
+            const porc = getMontoRealDesde('nuevo-prestamo-porcentaje');
             const cuotas = parseInt(document.getElementById('nuevo-prestamo-cuotas').value)||1;
             const ganancia = cap * (porc/100);
             const total = cap + ganancia;
@@ -985,16 +939,14 @@
 
         window.guardarPrestamo = async function() {
             const nom = document.getElementById('nuevo-prestamo-nombre').value.trim();
-            const capStr = document.getElementById('nuevo-prestamo-capital').value.replace(/,/g, '.');
-            const porcStr = document.getElementById('nuevo-prestamo-porcentaje').value.replace(/,/g, '.');
+            const cap = getMontoRealDesde('nuevo-prestamo-capital');
+            const porc = getMontoRealDesde('nuevo-prestamo-porcentaje');
             const cuotasStr = document.getElementById('nuevo-prestamo-cuotas').value;
             const isTemp = document.getElementById('check-temporal').checked;
 
-            if(!nom || !capStr || (!isTemp && (!porcStr || !cuotasStr))) { alert("Completa todos los campos obligatorios."); return; }
+            if(!nom || cap <= 0 || (!isTemp && (!cuotasStr))) { alert("Completa todos los campos obligatorios."); return; }
             if(!currentUser) { alert("Aún conectando a la Nube."); return; }
 
-            const cap = parseFloat(capStr);
-            const porc = isTemp ? 0 : parseFloat(porcStr);
             const cuotas = isTemp ? 1 : parseInt(cuotasStr);
             const frec = isTemp ? 'Único' : document.getElementById('nuevo-prestamo-frecuencia').value;
 
@@ -1153,7 +1105,12 @@
             await saveStateToDB();
 
             const histRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'historial');
-            await addDoc(histRef, { fecha: window.getFechaActualStr(), nom: `Cobro a ${p.nombre}`, monto: c.monto, tipo: 'ingreso', cat: 'Cobro', moneda: p.moneda, timestamp: Date.now() });
+            await addDoc(histRef, {
+                fecha: window.getFechaActualStr(),
+                nom: `Cobro a ${p.nombre}`, monto: c.monto, tipo: 'ingreso', cat: 'Cobro', moneda: p.moneda,
+                timestamp: Date.now()
+            });
+
             window.mostrarToast("Pago Verificado en Nube", "bg-income", "ph-check");
         };
 
@@ -1176,6 +1133,7 @@
                 const pRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'prestamos', window.prestamoPendienteEliminar);
                 await deleteDoc(pRef);
             }
+            
             window.cerrarDetallePrestamo();
             window.mostrarToast("Préstamo Eliminado de Nube", "bg-slate-800", "ph-trash");
         };
@@ -1185,16 +1143,26 @@
             document.getElementById('view-' + viewId).classList.remove('hidden'); 
             document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active'); el.querySelector('i').style.color='#94A3B8'; });
             btn.classList.add('active');
+            window.updateNavIconColor(viewId === 'registro' ? (window.tipoActual === 'ingreso' ? '#10B981' : '#F43F5E') : null);
+        };
+        window.updateNavIconColor = function(c) {
             const i = document.querySelector('.nav-item.active i');
-            if(viewId === 'registro') { if(i) i.style.color = window.tipoActual === 'ingreso' ? '#10B981' : '#F43F5E'; }
-            else { if(i) i.style.color = '#0F172A'; }
+            const isRegistroView = document.getElementById('view-registro').classList.contains('hidden') === false;
+            if(c && i && isRegistroView) {
+                i.style.color = c; 
+            } else if (i && !isRegistroView) {
+                i.style.color = '#0F172A'; 
+            }
         };
 
+        // LLAMADA INICIAL DE ESTILO DE ICONO AL CARGAR
+        window.updateNavIconColor('#10B981');
+
         window.analizarInversion = function() {
-            const costo = parseFloat(document.getElementById('sim-inv-costo').value.replace(/,/g, '.'));
+            const costo = getMontoRealDesde('sim-inv-costo');
             const meses = parseInt(document.getElementById('sim-inv-meses').value);
             const res = document.getElementById('res-inversion');
-            if(!costo||!meses) { alert("Completa los datos de la compra"); return; }
+            if(costo<=0||!meses) { alert("Completa los datos de la compra"); return; }
             const cuotaMensual = costo/meses;
             const ingresosPromedio = window.state.ingresosSoles > 0 ? window.state.ingresosSoles : 1000; 
             const porcentaje = (cuotaMensual / ingresosPromedio) * 100;
@@ -1205,10 +1173,10 @@
         };
 
         window.analizarPrestamo = function() {
-            const cap = parseFloat(document.getElementById('sim-pre-capital').value.replace(/,/g, '.'));
-            const int = parseFloat(document.getElementById('sim-pre-interes').value.replace(/,/g, '.'));
+            const cap = getMontoRealDesde('sim-pre-capital');
+            const int = getMontoRealDesde('sim-pre-interes');
             const res = document.getElementById('res-prestamo');
-            if(!cap||isNaN(int)) { alert("Completa los datos del préstamo"); return; }
+            if(cap<=0||isNaN(int)) { alert("Completa los datos del préstamo"); return; }
             const porcentajeLiquidez = (cap / Math.max(window.state.soles, 1)) * 100;
             const ganancia = cap * (int/100);
             res.classList.remove('hidden','bg-emerald-50','bg-warningLight','bg-rose-50');
@@ -1219,7 +1187,7 @@
 
         window.generarPDF = function() {
             const btn = document.getElementById('btn-generar-pdf');
-            btn.innerHTML = `<i class="ph ph-spinner animate-spin text-xl"></i> Generando...`;
+            btn.innerHTML = `<i class="ph ph-spinner animate-spin-slow text-xl"></i> Generando...`;
             btn.classList.add('opacity-75', 'cursor-wait');
 
             document.getElementById('pdf-mes').innerText = document.getElementById('select-mes-pdf').options[0].text;
@@ -1279,22 +1247,26 @@
         // --- FIREBASE LISTENERS ---
         function setupListeners() {
             if(!currentUser) return;
+
+            if(window.unsubscribeState) window.unsubscribeState();
             const stateRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'data', 'estado');
-            onSnapshot(stateRef, (docSnap) => {
+            window.unsubscribeState = onSnapshot(stateRef, (docSnap) => {
                 if(docSnap.exists()) window.state = docSnap.data();
                 else setDoc(stateRef, window.state);
                 window.actualizarUI();
             });
 
+            if(window.unsubscribeHist) window.unsubscribeHist();
             const histRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'historial');
-            onSnapshot(histRef, (snap) => {
+            window.unsubscribeHist = onSnapshot(histRef, (snap) => {
                 const docs = []; snap.forEach(d => docs.push({ id: d.id, ...d.data() }));
                 window.historialMovimientos = docs.sort((a,b) => b.timestamp - a.timestamp);
                 window.renderHistorialUI();
             });
 
+            if(window.unsubscribePrest) window.unsubscribePrest();
             const prestRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'prestamos');
-            onSnapshot(prestRef, (snap) => {
+            window.unsubscribePrest = onSnapshot(prestRef, (snap) => {
                 const docs = []; snap.forEach(d => docs.push({ id: d.id, ...d.data() }));
                 window.dbPrestamos = docs.sort((a,b) => b.timestamp - a.timestamp);
                 window.renderListaPrestamos();
@@ -1318,47 +1290,42 @@
             window.actualizarUI();
 
             try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
+                // Iniciar Firebase de Forma Anónima Silenciosa
+                await signInAnonymously(auth);
             } catch (error) {
                 console.error("Auth Error:", error);
-                document.getElementById('loading-overlay').innerHTML = "<h2 class='text-red-500 font-bold'>Error de Conexión</h2><p class='text-slate-500'>No se pudo conectar a Firebase.</p>";
+                const overlay = document.getElementById('loading-overlay');
+                overlay.innerHTML = "<div class='text-center px-6'><i class='ph-fill ph-warning-circle text-5xl text-red-500 mb-2'></i><h2 class='text-red-500 font-bold text-xl'>Error de Conexión</h2><p class='text-slate-500 mt-2 text-sm'>Debes activar 'Anónimo' en Firebase Authentication -> Sign-in methods.</p></div>";
+                overlay.classList.remove('hidden');
             }
         };
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
+                // Solo cargar datos si el candado ya se quitó (por si la BD responde rápido)
                 if (document.getElementById('view-lockscreen').classList.contains('hidden')) {
-                    setupListeners();
+                    setupListeners(); 
                 }
-                setTimeout(() => {
-                    const overlay = document.getElementById('loading-overlay');
-                    if(overlay) {
-                        overlay.classList.add('opacity-0');
-                        setTimeout(() => overlay.classList.add('hidden'), 500);
-                    }
-                }, 800);
+                const overlay = document.getElementById('loading-overlay');
+                if(overlay) {
+                    overlay.classList.add('opacity-0');
+                    setTimeout(() => overlay.classList.add('hidden'), 500);
+                }
             }
         });
 
         // ARRANQUE SEGURO
-        if(!HAS_PIN) {
-            document.addEventListener("DOMContentLoaded", () => {
-                initApp();
-            });
-        } else {
-            document.addEventListener("DOMContentLoaded", () => {
-                document.getElementById('view-lockscreen').classList.remove('hidden');
-                if(HAS_BIO) {
-                    document.getElementById('btn-faceid').classList.remove('invisible');
-                    window.iniciarBiometria(); // Intento automático
-                }
-            });
-        }
+        document.addEventListener("DOMContentLoaded", () => {
+            document.getElementById('view-lockscreen').classList.remove('hidden');
+            
+            if(HAS_BIO) {
+                document.getElementById('btn-faceid').classList.remove('invisible');
+                window.iniciarBiometria(); 
+            }
+            initApp();
+        });
+
     </script>
 </body>
 </html>
