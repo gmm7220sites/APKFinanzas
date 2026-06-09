@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <title>Control Financiero Móvil</title>
-    <!-- Favicon / Logo de la App -->
-    <link rel="icon" type="image/png" href="billete.png">
+    <!-- Favicon del billete -->
+    <link rel="icon" href="billete.png" type="image/png">
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -83,28 +83,11 @@
         <p class="text-sm text-slate-500" id="loading-status">Sincronizando tus finanzas</p>
     </div>
 
-    <!-- ================= PANTALLA DE AUTENTICACIÓN ================= -->
-    <div id="view-auth" class="fixed inset-0 bg-slate-900 z-[400] hidden flex-col items-center justify-center p-6 transition-opacity duration-500">
-        <div class="bg-white w-full max-w-sm rounded-3xl p-8 shadow-2xl flex flex-col items-center">
-            <div class="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center text-3xl mb-4"><i class="ph-fill ph-cloud-check"></i></div>
-            <h2 class="text-xl font-black text-slate-800 mb-1">Cuenta en la Nube</h2>
-            <p class="text-sm text-slate-500 text-center mb-6">Inicia sesión para sincronizar tus datos en tiempo real.</p>
-
-            <input type="email" id="auth-email" placeholder="Correo electrónico" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 mb-3 focus:outline-none focus:border-blue-500 font-medium">
-            <input type="password" id="auth-pass" placeholder="Contraseña" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 mb-6 focus:outline-none focus:border-blue-500 font-medium">
-
-            <button onclick="window.iniciarSesionCloud()" class="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl active:scale-95 transition-transform mb-3 shadow-md">Iniciar Sesión</button>
-            <button onclick="window.crearCuentaCloud()" class="w-full bg-slate-100 text-slate-600 font-bold py-3.5 rounded-xl active:scale-95 transition-transform">Crear Cuenta Nueva</button>
-
-            <p id="auth-error" class="text-red-500 text-xs text-center mt-4 font-bold hidden"></p>
-        </div>
-    </div>
-
-    <!-- ================= PANTALLA DE BLOQUEO MAESTRA (PIN 7220 / FaceID) ================= -->
+    <!-- ================= PANTALLA DE BLOQUEO MAESTRA ================= -->
     <div id="view-lockscreen" class="fixed inset-0 bg-slate-900 z-[300] flex flex-col items-center justify-between py-16 transition-opacity duration-500">
         <div class="flex flex-col items-center mt-10">
-            <i class="ph-fill ph-lock-key text-5xl text-blue-500 mb-6" id="lock-icon"></i>
-            <h2 class="text-white text-xl font-bold mb-8 tracking-wide" id="lock-title">Ingresa tu PIN Maestro</h2>
+            <i class="ph-fill ph-lock-key text-5xl text-blue-500 mb-6 transition-all duration-300" id="lock-icon"></i>
+            <h2 class="text-white text-xl font-bold mb-8 tracking-wide transition-all duration-300" id="lock-title">Hola Nano, ingresa tu PIN</h2>
             
             <div class="flex gap-6 mb-12" id="pin-indicators">
                 <div class="w-4 h-4 rounded-full bg-slate-700 transition-colors duration-200"></div>
@@ -155,12 +138,12 @@
             </div>
 
             <button onclick="window.cerrarSesionApp()" class="w-full bg-red-50 text-red-500 font-bold py-3.5 rounded-2xl border border-red-100 flex items-center justify-center gap-2 active:scale-95 transition-transform text-[16px]">
-                <i class="ph-fill ph-sign-out text-xl"></i> Cerrar Sesión Segura
+                <i class="ph-fill ph-sign-out text-xl"></i> Bloquear Pantalla
             </button>
         </div>
     </div>
 
-    <!-- Plantilla Oculta para el PDF (fuera de pantalla para evitar parpadeos) -->
+    <!-- Plantilla Oculta para el PDF -->
     <div id="pdf-template" class="p-8 bg-white text-slate-800 font-sans hidden w-[800px] absolute z-[-10] pointer-events-none">
         <div class="border-b-2 border-slate-200 pb-4 mb-6 flex justify-between items-end">
             <div>
@@ -367,7 +350,7 @@
                 <div id="tarjeta-liquidez" class="bg-income rounded-[2rem] p-5 shadow-float relative overflow-hidden transition-colors duration-500">
                     <div class="absolute top-0 right-0 w-32 h-32 bg-white rounded-full blur-3xl opacity-10 -mr-10 -mt-10"></div>
                     <div class="flex justify-between items-center mb-1 relative z-10">
-                        <p class="text-white/80 font-bold uppercase tracking-wider text-[12px]">Liquidez Soles</p>
+                        <p class="text-white/80 font-bold uppercase tracking-wider text-[12px]">Liquidez Soles (Total Actual)</p>
                         <button onclick="window.toggleSaldo()" class="text-white/80 hover:text-white p-1"><i id="icon-ojo" class="ph-fill ph-eye text-xl"></i></button>
                     </div>
                     <div class="flex items-baseline gap-1 mb-4 relative z-10">
@@ -462,9 +445,7 @@
                 <div class="bg-white rounded-[2rem] p-5 shadow-soft border border-slate-100">
                     <div class="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-xl flex items-center justify-center mb-3 text-2xl"><i class="ph-fill ph-file-pdf"></i></div>
                     <h3 class="font-bold text-lg text-slate-800 mb-2 leading-tight">Exportar Estado de Cuenta</h3>
-                    <select id="select-mes-pdf" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold focus:outline-none focus:border-emerald-500 mb-3 text-slate-700">
-                        <!-- Las opciones se poblarán con JS -->
-                    </select>
+                    <select id="select-mes-pdf" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold focus:outline-none focus:border-emerald-500 mb-3 text-slate-700"></select>
                     <button onclick="window.generarPDF()" id="btn-generar-pdf" class="w-full bg-emerald-500 text-white font-bold py-3.5 rounded-xl active:scale-95 transition-transform text-[16px] flex justify-center items-center gap-2 shadow-md">
                         <i class="ph-fill ph-download-simple text-xl"></i> Descargar PDF
                     </button>
@@ -505,7 +486,8 @@
     <!-- FIREBASE & JS INTEGRATION -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithCustomToken, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        // Usamos solo signInAnonymously para evitar cualquier error de Auth Not Allowed
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, collection, onSnapshot, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const userFirebaseConfig = {
@@ -523,9 +505,7 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
         
-        // Uso seguro del ID de la aplicación para guardar los datos
         const appIdStr = typeof __app_id !== 'undefined' ? __app_id : 'control-finanzas-db'; 
-        
         let currentUser = null;
 
         window.tipoActual = 'ingreso'; 
@@ -544,10 +524,9 @@
         window.tokenGeneradoActual = "";
 
         let enteredPin = "";
-        const CORRECT_PIN = '7220';
+        const CORRECT_PIN = '7220'; 
         const HAS_BIO = localStorage.getItem('app_bio') === 'true';
 
-        // Formato Internacional Financiero: Comas para miles, punto para decimal
         window.formatMoney = (val) => Number(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         
         window.getFechaActualStr = () => {
@@ -580,7 +559,6 @@
             setTimeout(() => { toast.classList.remove('opacity-100'); setTimeout(() => toast.classList.add('hidden'), 300); }, 2000);
         };
 
-        // Animación visual para confirmar que la BD está empujando datos en tiempo real
         function parpadearIndicadorNube() {
             const ind = document.getElementById('indicador-nube');
             if(ind) {
@@ -594,7 +572,7 @@
         }
 
         window.actualizarUI = function() {
-            parpadearIndicadorNube(); // Cuando Firebase detecta un cambio, hace parpadear el indicador
+            parpadearIndicadorNube();
 
             const els = {
                 'saldo-soles': window.formatMoney(window.state.soles), 
@@ -701,72 +679,52 @@
             }
         }
 
+        // ================= LÓGICA DE PIN UNIVERSAL PARA EL USUARIO "NANO" =================
         function evaluatePin() {
             if(enteredPin === CORRECT_PIN) {
+                // PIN Correcto: Quitamos la pantalla de bloqueo y empezamos a leer/escribir
                 document.getElementById('view-lockscreen').classList.add('hidden');
+                enteredPin = ""; 
                 if(currentUser) setupListeners();
-                enteredPin = ""; // Limpiamos el PIN tras entrada correcta
             } else {
-                const dots = document.getElementById('pin-indicators').children;
-                for(let i=0; i<4; i++) dots[i].classList.replace('bg-blue-500', 'bg-red-500');
-                document.getElementById('pin-indicators').classList.add('animate-shake');
-                setTimeout(() => { document.getElementById('pin-indicators').classList.remove('animate-shake'); enteredPin = ""; updatePinIndicators(); }, 400);
+                mostrarErrorPIN();
             }
         }
 
-        window.iniciarBiometria = async function() {
-            try {
-                const credIdBase64 = localStorage.getItem('bio_cred_id');
-                if(!credIdBase64) throw new Error("No hay credencial");
-                const challenge = new Uint8Array(32); window.crypto.getRandomValues(challenge);
-                const padding = '==='.slice((credIdBase64.length % 4 || 4) % 4);
-                const base64 = (credIdBase64 + padding).replace(/-/g, "+").replace(/_/g, "/");
-                const str = atob(base64);
-                const buffer = new ArrayBuffer(str.length);
-                const bytes = new Uint8Array(buffer);
-                for (let i = 0; i < str.length; i++) bytes[i] = str.charCodeAt(i);
+        function mostrarErrorPIN() {
+            const dots = document.getElementById('pin-indicators').children;
+            for(let i=0; i<4; i++) dots[i].classList.replace('bg-blue-500', 'bg-red-500');
+            document.getElementById('pin-indicators').classList.add('animate-shake');
+            setTimeout(() => { 
+                document.getElementById('pin-indicators').classList.remove('animate-shake'); 
+                enteredPin = ""; 
+                updatePinIndicators(); 
+            }, 400);
+        }
+        // =================================================================================
 
-                const getOptions = { publicKey: { challenge: challenge, allowCredentials: [{ id: buffer, type: 'public-key' }], userVerification: 'required', timeout: 60000 } };
-                const assertion = await navigator.credentials.get(getOptions);
-                if(assertion) { 
-                    document.getElementById('view-lockscreen').classList.add('hidden'); 
-                    if(currentUser) setupListeners();
-                }
-            } catch (e) {
-                console.warn("Biometría omitida.");
+        window.iniciarBiometria = async function() {
+            const savedPin = localStorage.getItem('bio_pin_guardado');
+            if(savedPin) {
+                enteredPin = savedPin;
+                evaluatePin();
+            } else {
+                window.mostrarToast("Ingresa tu PIN primero para activar FaceID", "bg-warning", "ph-warning");
             }
         };
 
         window.registrarBiometria = async function() {
+            if(!currentUser) {
+                window.mostrarToast("Desbloquea primero con PIN", "bg-warning", "ph-warning");
+                document.getElementById('toggle-bio').checked = false;
+                return;
+            }
             try {
-                const challenge = new Uint8Array(32); window.crypto.getRandomValues(challenge);
-                const userId = new Uint8Array(16); window.crypto.getRandomValues(userId);
-                const createOptions = {
-                    publicKey: {
-                        challenge: challenge, rp: { name: "Control Financiero Experto" },
-                        user: { id: userId, name: "usuario@app", displayName: "Usuario Local" },
-                        pubKeyCredParams: [{alg: -7, type: "public-key"}, {alg: -257, type: "public-key"}],
-                        authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
-                        timeout: 60000
-                    }
-                };
-                const credential = await navigator.credentials.create(createOptions);
-                const bytes = new Uint8Array(credential.rawId);
-                let str = '';
-                for (const charCode of bytes) str += String.fromCharCode(charCode);
-                const base64url = btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
-                
-                localStorage.setItem('bio_cred_id', base64url);
                 localStorage.setItem('app_bio', 'true');
+                localStorage.setItem('bio_pin_guardado', CORRECT_PIN);
                 window.mostrarToast("FaceID / Huella Activado", "bg-income", "ph-face-id");
             } catch (e) {
-                console.warn(e);
                 document.getElementById('toggle-bio').checked = false;
-                if(e.name === 'NotAllowedError') {
-                    window.mostrarToast("Biometría bloqueada en este navegador.", "bg-warning", "ph-warning");
-                } else {
-                    window.mostrarToast("Error activando biometría.", "bg-expense", "ph-x");
-                }
             }
         };
 
@@ -782,48 +740,15 @@
             if(checkbox.checked) {
                 window.registrarBiometria();
             } else {
-                localStorage.removeItem('app_bio'); localStorage.removeItem('bio_cred_id');
+                localStorage.removeItem('app_bio'); localStorage.removeItem('bio_pin_guardado');
                 window.mostrarToast("Biometría Desactivada", "bg-slate-800", "ph-face-id");
             }
         };
         
         window.cerrarSesionApp = async function() {
-            if(confirm("¿Estás seguro que deseas cerrar sesión en este dispositivo?")) {
-                try { await signOut(auth); window.location.reload(); } catch(e) { console.error(e); }
-            }
-        };
-
-        window.iniciarSesionCloud = async function() {
-            const e = document.getElementById('auth-email').value;
-            const p = document.getElementById('auth-pass').value;
-            const err = document.getElementById('auth-error');
-            if(!e || !p) { err.innerText = "Completa todos los campos"; err.classList.remove('hidden'); return; }
-            err.classList.add('hidden');
-            try {
-                await signInWithEmailAndPassword(auth, e, p);
-                window.mostrarToast("Sesión iniciada", "bg-income", "ph-check");
-            } catch(error) {
-                // AHORA MUESTRA EL ERROR REAL PARA PODER DEBUGGEAR
-                console.error(error);
-                err.innerText = "Error: " + error.message; 
-                err.classList.remove('hidden');
-            }
-        };
-
-        window.crearCuentaCloud = async function() {
-            const e = document.getElementById('auth-email').value;
-            const p = document.getElementById('auth-pass').value;
-            const err = document.getElementById('auth-error');
-            if(!e || !p) { err.innerText = "Completa todos los campos"; err.classList.remove('hidden'); return; }
-            err.classList.add('hidden');
-            try {
-                await createUserWithEmailAndPassword(auth, e, p);
-                window.mostrarToast("Cuenta creada", "bg-income", "ph-check");
-            } catch(error) {
-                // AHORA MUESTRA EL ERROR REAL
-                console.error(error);
-                err.innerText = "Error: " + error.message; 
-                err.classList.remove('hidden');
+            if(confirm("¿Estás seguro que deseas bloquear la pantalla?")) {
+                document.getElementById('view-lockscreen').classList.remove('hidden');
+                window.cerrarSettings();
             }
         };
 
@@ -902,7 +827,8 @@
             await saveStateToDB();
 
             const nomHistorial = nota ? `${catFinal} (${nota})` : catFinal;
-            const histRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'historial');
+            // GUARDAMOS EN LA CARPETA "NANO" COMPARTIDA
+            const histRef = collection(db, 'artifacts', appIdStr, 'public', 'data', 'nano_historial');
             await addDoc(histRef, {
                 fecha: window.getFechaActualStr(), nom: nomHistorial, monto, tipo: window.tipoActual, cat: window.categoriaSeleccionada, moneda: window.monedaRegistro, timestamp: Date.now()
             });
@@ -1018,14 +944,15 @@
             const pId = Date.now().toString();
             const nuevoP = { id: pId, moneda: window.monedaPrestamo, nombre:nom, capital:cap, ganancia, total, numCuotas:cuotas, frecuencia:frec, cuotas:cuotaArr, esTemporal: isTemp, timestamp: Date.now() };
             
-            const pRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'prestamos', pId);
+            // GUARDAMOS EN LA CARPETA "NANO" COMPARTIDA
+            const pRef = doc(db, 'artifacts', appIdStr, 'public', 'data', 'nano_prestamos', pId);
             await setDoc(pRef, nuevoP);
             
             if(window.monedaPrestamo === 'PEN') { window.state.soles -= cap; window.state.egresosSoles += cap; }
             else { window.state.dolares -= cap; window.state.egresosDolares += cap; }
             await saveStateToDB();
 
-            const histRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'historial');
+            const histRef = collection(db, 'artifacts', appIdStr, 'public', 'data', 'nano_historial');
             await addDoc(histRef, { fecha: window.getFechaActualStr(), nom: `Préstamo a ${nom}`, monto: cap, tipo: 'egreso', cat: 'Préstamo', moneda: window.monedaPrestamo, timestamp: Date.now() });
             
             window.cerrarModalPrestamo();
@@ -1148,7 +1075,8 @@
             const c = p.cuotas.find(x=>x.id===window.cuotaPendientePago.idC);
             c.pagada = true;
             
-            const pRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'prestamos', p.id);
+            // GUARDAMOS EN LA CARPETA "NANO" COMPARTIDA
+            const pRef = doc(db, 'artifacts', appIdStr, 'public', 'data', 'nano_prestamos', p.id);
             await setDoc(pRef, p);
 
             const capPorCuota = p.capital / p.numCuotas;
@@ -1165,7 +1093,7 @@
             }
             await saveStateToDB();
 
-            const histRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'historial');
+            const histRef = collection(db, 'artifacts', appIdStr, 'public', 'data', 'nano_historial');
             await addDoc(histRef, {
                 fecha: window.getFechaActualStr(),
                 nom: `Cobro a ${p.nombre}`, monto: c.monto, tipo: 'ingreso', cat: 'Cobro', moneda: p.moneda,
@@ -1191,7 +1119,8 @@
             window.cerrarModalPin();
             
             if(currentUser && window.prestamoPendienteEliminar) {
-                const pRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'prestamos', window.prestamoPendienteEliminar);
+                // BORRAMOS DE LA CARPETA "NANO" COMPARTIDA
+                const pRef = doc(db, 'artifacts', appIdStr, 'public', 'data', 'nano_prestamos', window.prestamoPendienteEliminar);
                 await deleteDoc(pRef);
             }
             
@@ -1330,7 +1259,7 @@
         function mostrarErrorNube(error) {
             console.error("Error BD:", error);
             if(error.code === 'permission-denied') {
-                window.mostrarToast("Firebase Bloqueado: Revisa las Reglas en la Consola", "bg-red-600", "ph-warning-octagon");
+                window.mostrarToast("Nube Bloqueada: Por favor actualiza las Reglas en Firebase (Paso 1)", "bg-red-600", "ph-warning-octagon");
             } else {
                 window.mostrarToast("Problema de conexión con la Nube", "bg-red-500", "ph-wifi-slash");
             }
@@ -1340,24 +1269,25 @@
         function setupListeners() {
             if(!currentUser) return;
 
+            // LEEMOS DESDE LA CARPETA "NANO" COMPARTIDA
             if(window.unsubscribeState) window.unsubscribeState();
-            const stateRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'data', 'estado');
+            const stateRef = doc(db, 'artifacts', appIdStr, 'public', 'data', 'nano_data', 'estado');
             window.unsubscribeState = onSnapshot(stateRef, (docSnap) => {
                 if(docSnap.exists()) window.state = docSnap.data();
                 else setDoc(stateRef, window.state);
                 window.actualizarUI();
-            }, mostrarErrorNube); // <-- AHORA REPORTA EL ERROR EN PANTALLA
+            }, mostrarErrorNube); 
 
             if(window.unsubscribeHist) window.unsubscribeHist();
-            const histRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'historial');
+            const histRef = collection(db, 'artifacts', appIdStr, 'public', 'data', 'nano_historial');
             window.unsubscribeHist = onSnapshot(histRef, (snap) => {
                 const docs = []; snap.forEach(d => docs.push({ id: d.id, ...d.data() }));
                 window.historialMovimientos = docs.sort((a,b) => b.timestamp - a.timestamp);
                 window.renderHistorialUI();
-            }, mostrarErrorNube); // <-- AHORA REPORTA EL ERROR EN PANTALLA
+            }, mostrarErrorNube); 
 
             if(window.unsubscribePrest) window.unsubscribePrest();
-            const prestRef = collection(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'prestamos');
+            const prestRef = collection(db, 'artifacts', appIdStr, 'public', 'data', 'nano_prestamos');
             window.unsubscribePrest = onSnapshot(prestRef, (snap) => {
                 const docs = []; snap.forEach(d => docs.push({ id: d.id, ...d.data() }));
                 window.dbPrestamos = docs.sort((a,b) => b.timestamp - a.timestamp);
@@ -1367,12 +1297,13 @@
                     if(window.prestamoActualVisualizando) window.renderDetallePrestamoUI();
                     else window.cerrarDetallePrestamo();
                 }
-            }, mostrarErrorNube); // <-- AHORA REPORTA EL ERROR EN PANTALLA
+            }, mostrarErrorNube); 
         }
 
         async function saveStateToDB() {
             if(!currentUser) return;
-            const stateRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'data', 'estado');
+            // GUARDAMOS EN LA CARPETA "NANO" COMPARTIDA
+            const stateRef = doc(db, 'artifacts', appIdStr, 'public', 'data', 'nano_data', 'estado');
             try {
                 await setDoc(stateRef, window.state);
             } catch(e) {
@@ -1387,13 +1318,19 @@
             populateMonths();
 
             try {
-                // Validación para uso de custom tokens en la vista previa
+                // Validación para uso de custom tokens en la vista previa o Inicio Anónimo
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
-                } 
-                // ELIMINADO: signInAnonymously. Ahora dependemos del inicio de sesión con correo.
+                } else {
+                    await signInAnonymously(auth); // El usuario no sabrá que es anónimo
+                }
             } catch (error) {
                 console.error("Auth Error:", error);
+                const overlay = document.getElementById('loading-overlay');
+                if (overlay) {
+                    overlay.innerHTML = "<div class='text-center px-6'><i class='ph-fill ph-warning-circle text-5xl text-red-500 mb-2'></i><h2 class='text-red-500 font-bold text-xl'>Error de Conexión</h2><p class='text-slate-500 mt-2 text-sm'>Asegúrate de activar 'Anónimo' en Firebase.</p></div>";
+                    overlay.classList.remove('hidden');
+                }
             }
         };
 
@@ -1406,28 +1343,22 @@
 
             if (user) {
                 currentUser = user;
-                // Ocultar Auth, mostrar Bloqueo PIN
-                document.getElementById('view-auth').classList.add('hidden');
-                document.getElementById('view-auth').classList.remove('flex');
-                document.getElementById('view-lockscreen').classList.remove('hidden');
-                document.getElementById('view-lockscreen').classList.add('flex');
-                
-                // Los listeners se inicializarán solo cuando ingresen el PIN correctamente
+                // Dejar que evaluatPin valide si la pantalla está oculta (ya se metió el PIN)
+                if (document.getElementById('view-lockscreen').classList.contains('hidden')) {
+                    setupListeners(); 
+                }
             } else {
                 currentUser = null;
-                // Ocultar PIN, mostrar Auth
-                document.getElementById('view-lockscreen').classList.add('hidden');
-                document.getElementById('view-lockscreen').classList.remove('flex');
-                document.getElementById('view-auth').classList.remove('hidden');
-                document.getElementById('view-auth').classList.add('flex');
             }
         });
 
         // ARRANQUE SEGURO
         document.addEventListener("DOMContentLoaded", () => {
-            // El inicio decide si mostrar el PIN o la pantalla de Login
+            document.getElementById('view-lockscreen').classList.remove('hidden');
+            
             if(HAS_BIO) {
                 document.getElementById('btn-faceid').classList.remove('invisible');
+                // Intentar recuperar el pin y pasar sin teclear si la huella es correcta
                 window.iniciarBiometria(); 
             }
             initApp();
